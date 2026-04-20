@@ -9,7 +9,16 @@ import {
   compute as computeG48,
   type GoldschneiderOutput,
 } from "@bonyeon/engine-goldschneider";
-import { useMemo, useState } from "react";
+import {
+  compute as computeMbti,
+  INSTRUMENT_VERSION as MBTI_INSTRUMENT_VERSION,
+  ITEMS as MBTI_ITEMS,
+  AXIS_LABELS as MBTI_AXIS_LABELS,
+  type AxisId as MbtiAxisId,
+  type LikertValue as MbtiLikertValue,
+  type MbtiOutput,
+} from "@bonyeon/engine-mbti";
+import { useCallback, useMemo, useState } from "react";
 
 // ─────────────────────────────────────────────────────────────
 
@@ -31,7 +40,7 @@ const TABS: ReadonlyArray<{ key: TabKey; kr: string; han: string; built: boolean
   { key: "saju", kr: "사주", han: "四柱", built: true },
   { key: "g48", kr: "48주 원형", han: "週", built: true },
   { key: "ziwei", kr: "자미두수", han: "紫微", built: false },
-  { key: "axis", kr: "4축 성향", han: "軸", built: false },
+  { key: "axis", kr: "4축 성향", han: "軸", built: true },
   { key: "ennea", kr: "내면 동기", han: "九", built: false },
   { key: "cross", kr: "교차 인사이트", han: "×", built: false },
 ];
@@ -56,6 +65,22 @@ export default function App() {
 
   const [tab, setTab] = useState<TabKey>("saju");
   const [traceOpen, setTraceOpen] = useState(false);
+
+  // MBTI survey state
+  const [mbtiAnswers, setMbtiAnswers] = useState<Record<string, MbtiLikertValue>>({});
+  const mbti: MbtiOutput | null = useMemo(() => {
+    const answered = Object.entries(mbtiAnswers);
+    if (answered.length === 0) return null;
+    return computeMbti({
+      instrumentVersion: MBTI_INSTRUMENT_VERSION,
+      answers: answered.map(([id, value]) => ({ questionId: id, value })),
+    });
+  }, [mbtiAnswers]);
+
+  const setMbtiAnswer = useCallback((id: string, value: MbtiLikertValue) => {
+    setMbtiAnswers((prev) => ({ ...prev, [id]: value }));
+  }, []);
+  const resetMbti = useCallback(() => setMbtiAnswers({}), []);
 
   const saju: ManseryeokOutput | null = useMemo(() => {
     try {
@@ -103,6 +128,10 @@ export default function App() {
             <ReportView
               saju={saju}
               g48={g48}
+              mbti={mbti}
+              mbtiAnswers={mbtiAnswers}
+              onMbtiAnswer={setMbtiAnswer}
+              onMbtiReset={resetMbti}
               tab={tab}
               onTabChange={setTab}
               traceOpen={traceOpen}
@@ -362,6 +391,10 @@ function clamp(n: number, lo: number, hi: number): number {
 function ReportView({
   saju,
   g48,
+  mbti,
+  mbtiAnswers,
+  onMbtiAnswer,
+  onMbtiReset,
   tab,
   onTabChange,
   traceOpen,
@@ -370,6 +403,10 @@ function ReportView({
 }: {
   saju: ManseryeokOutput;
   g48: GoldschneiderOutput | null;
+  mbti: MbtiOutput | null;
+  mbtiAnswers: Record<string, MbtiLikertValue>;
+  onMbtiAnswer: (id: string, v: MbtiLikertValue) => void;
+  onMbtiReset: () => void;
   tab: TabKey;
   onTabChange: (t: TabKey) => void;
   traceOpen: boolean;
@@ -385,7 +422,15 @@ function ReportView({
       <section className="flex-1 overflow-y-auto">
         {tab === "saju" && <SajuPanel saju={saju} />}
         {tab === "g48" && g48 && <G48Panel g48={g48} />}
-        {tab !== "saju" && tab !== "g48" && <NotReadyPanel tab={tab} />}
+        {tab === "axis" && (
+          <AxisPanel
+            mbti={mbti}
+            answers={mbtiAnswers}
+            onAnswer={onMbtiAnswer}
+            onReset={onMbtiReset}
+          />
+        )}
+        {tab !== "saju" && tab !== "g48" && tab !== "axis" && <NotReadyPanel tab={tab} />}
 
         <div className="border-t border-neutral-200 bg-[--color-neutral-25]">
           <button
@@ -1013,6 +1058,382 @@ function WeekRing({ currentId }: { currentId: number }) {
           {String(currentId).padStart(2, "0")}
         </text>
       </svg>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────
+// 4축 성향 panel (MBTI 자체 간이 진단)
+
+function AxisPanel({
+  mbti,
+  answers,
+  onAnswer,
+  onReset,
+}: {
+  mbti: MbtiOutput | null;
+  answers: Record<string, MbtiLikertValue>;
+  onAnswer: (id: string, v: MbtiLikertValue) => void;
+  onReset: () => void;
+}) {
+  const answered = Object.keys(answers).length;
+  const total = MBTI_ITEMS.length;
+  const complete = answered >= total;
+
+  return (
+    <div className="px-6 py-8 md:px-10 md:py-10">
+      {/* Progress header */}
+      <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-[--color-neutral-25] p-4 shadow-sm">
+        <div>
+          <div
+            className="mb-1 text-[10px] uppercase tracking-[0.25em] text-[--color-accent-700]"
+            style={{ fontFamily: MONO }}
+          >
+            4축 자가 진단 · Quick Screening v0.1
+          </div>
+          <div className="text-sm text-neutral-600">
+            총 {total}문항 · 7점 척도 (1=매우 반대, 7=매우 동의){" "}
+            <span className="text-neutral-400">· MBTI® 공식 검사가 아님</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <ProgressBar current={answered} total={total} />
+          {answered > 0 && (
+            <button
+              type="button"
+              onClick={onReset}
+              className="text-xs text-neutral-500 underline underline-offset-2 hover:text-[--color-accent-700]"
+            >
+              초기화
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* Result at top if complete */}
+      {mbti && complete && <MbtiResult mbti={mbti} />}
+
+      {/* Questions */}
+      <section className="grid grid-cols-1 gap-3">
+        {MBTI_ITEMS.map((item, i) => (
+          <QuestionCard
+            key={item.id}
+            index={i + 1}
+            total={total}
+            prompt={item.prompt}
+            axis={item.axis}
+            value={answers[item.id]}
+            onChange={(v) => onAnswer(item.id, v)}
+          />
+        ))}
+      </section>
+    </div>
+  );
+}
+
+function ProgressBar({ current, total }: { current: number; total: number }) {
+  const pct = Math.round((current / total) * 100);
+  return (
+    <div className="flex items-center gap-3">
+      <div className="relative h-1.5 w-24 overflow-hidden rounded-full bg-neutral-200">
+        <div
+          className="absolute inset-y-0 left-0 bg-[--color-accent-500] transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span
+        className="text-xs tabular-nums text-neutral-500"
+        style={{ fontFamily: MONO }}
+      >
+        {current}/{total}
+      </span>
+    </div>
+  );
+}
+
+function QuestionCard({
+  index,
+  total,
+  prompt,
+  axis,
+  value,
+  onChange,
+}: {
+  index: number;
+  total: number;
+  prompt: string;
+  axis: MbtiAxisId;
+  value: MbtiLikertValue | undefined;
+  onChange: (v: MbtiLikertValue) => void;
+}) {
+  const axisColor: Record<MbtiAxisId, string> = {
+    ei: "var(--color-oh-water)",
+    sn: "var(--color-oh-wood)",
+    tf: "var(--color-oh-fire)",
+    jp: "var(--color-oh-earth)",
+  };
+  const axisLabel: Record<MbtiAxisId, string> = {
+    ei: "E/I",
+    sn: "S/N",
+    tf: "T/F",
+    jp: "J/P",
+  };
+
+  return (
+    <div
+      className="rounded-xl border border-neutral-200 bg-[--color-neutral-25] p-4 shadow-sm transition hover:border-neutral-300"
+      style={
+        value !== undefined
+          ? { borderColor: "var(--color-accent-300)" }
+          : undefined
+      }
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <div
+          className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-neutral-500"
+          style={{ fontFamily: MONO }}
+        >
+          <span className="tabular-nums">
+            {String(index).padStart(2, "0")}/{String(total).padStart(2, "0")}
+          </span>
+          <span
+            className="rounded-full px-2 py-0.5"
+            style={{
+              backgroundColor: "var(--color-neutral-100)",
+              color: axisColor[axis],
+            }}
+          >
+            {axisLabel[axis]}
+          </span>
+        </div>
+      </div>
+      <p className="mb-4 text-base leading-relaxed text-neutral-800">{prompt}</p>
+      <LikertScale value={value} onChange={onChange} />
+    </div>
+  );
+}
+
+function LikertScale({
+  value,
+  onChange,
+}: {
+  value: MbtiLikertValue | undefined;
+  onChange: (v: MbtiLikertValue) => void;
+}) {
+  const values: MbtiLikertValue[] = [1, 2, 3, 4, 5, 6, 7];
+  const sizeMap = [26, 30, 34, 38, 34, 30, 26];
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] uppercase tracking-wider text-neutral-400">
+          매우 반대
+        </span>
+        <div className="flex items-center gap-2">
+          {values.map((v, i) => {
+            const selected = value === v;
+            const sz = sizeMap[i] ?? 28;
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => onChange(v)}
+                aria-label={`점수 ${String(v)}`}
+                className={`flex items-center justify-center rounded-full border-2 transition ${
+                  selected
+                    ? "border-[--color-accent-500] bg-[--color-accent-500]"
+                    : "border-neutral-300 bg-[--color-neutral-25] hover:border-[--color-accent-300]"
+                }`}
+                style={{ width: sz, height: sz }}
+              >
+                {selected && (
+                  <span className="size-2 rounded-full bg-white opacity-90" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <span className="text-[10px] uppercase tracking-wider text-neutral-400">
+          매우 동의
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function MbtiResult({ mbti }: { mbti: MbtiOutput }) {
+  return (
+    <section className="mb-8 overflow-hidden rounded-2xl border border-[--color-accent-300]/50 bg-gradient-to-br from-[--color-neutral-25] via-[--color-neutral-25] to-[--color-accent-100]/40 p-6 shadow-sm md:p-8">
+      <div
+        className="mb-3 flex items-center gap-3 text-[10px] uppercase tracking-[0.25em] text-[--color-accent-700]"
+        style={{ fontFamily: MONO }}
+      >
+        <span>RESULT · Quick 16</span>
+        <div className="h-px flex-1 max-w-[6rem] bg-neutral-200" />
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-baseline gap-x-6 gap-y-2">
+        <div
+          className="text-7xl leading-none tracking-tight"
+          style={{ fontFamily: SERIF, letterSpacing: "-0.03em" }}
+        >
+          {mbti.code}
+        </div>
+        <div>
+          <div
+            className="text-2xl leading-tight"
+            style={{ fontFamily: SERIF }}
+          >
+            {mbti.typeName.kr}
+          </div>
+          <div
+            className="text-sm text-neutral-500"
+            style={{ fontFamily: SERIF, fontStyle: "italic" }}
+          >
+            {mbti.typeName.en}
+          </div>
+        </div>
+      </div>
+
+      {/* Keywords */}
+      <div className="mb-5 flex flex-wrap gap-2">
+        {mbti.typeName.keywords.map((k) => (
+          <span
+            key={k}
+            className="rounded-full border border-neutral-200 bg-[--color-neutral-25] px-3 py-1 text-sm text-neutral-700"
+          >
+            {k}
+          </span>
+        ))}
+      </div>
+
+      {mbti.typeName.misconception && (
+        <p className="mb-5 rounded-md border-l-2 border-[--color-accent-500] bg-[--color-neutral-25]/60 px-3 py-2 text-sm leading-relaxed text-neutral-700">
+          <span
+            className="mr-2 text-[10px] uppercase tracking-[0.2em] text-[--color-accent-700]"
+            style={{ fontFamily: MONO }}
+          >
+            NOTE
+          </span>
+          {mbti.typeName.misconception}
+        </p>
+      )}
+
+      {/* Axis bars */}
+      <div className="grid grid-cols-1 gap-2.5">
+        {(["ei", "sn", "tf", "jp"] as const).map((ax) => (
+          <AxisBar key={ax} axis={ax} result={mbti.axes[ax]} />
+        ))}
+      </div>
+
+      {/* Boundary notice */}
+      {mbti.boundaryNotices.length > 0 && (
+        <div className="mt-5 rounded-md border border-amber-200 bg-amber-50/50 p-3 text-xs text-neutral-700">
+          <div
+            className="mb-1 text-[10px] uppercase tracking-[0.2em] text-amber-700"
+            style={{ fontFamily: MONO }}
+          >
+            경계값 안내
+          </div>
+          <ul className="space-y-1">
+            {mbti.boundaryNotices.map((b) => (
+              <li key={b.axis}>
+                <span className="font-mono">{b.axis.toUpperCase()}</span> 축이
+                중심에 가깝습니다. 상황에 따라 <b>{b.alternateCode}</b> 성향도
+                함께 나타날 수 있습니다.
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Reliability */}
+      <div
+        className="mt-5 flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-neutral-500"
+        style={{ fontFamily: MONO }}
+      >
+        <span>
+          consistency {Math.round(mbti.reliability.consistency * 100)}%
+        </span>
+        <span>
+          decisiveness {Math.round(mbti.reliability.decisiveness * 100)}%
+        </span>
+        {mbti.reliability.flags.map((f) => (
+          <span
+            key={f}
+            className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700"
+          >
+            {f}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AxisBar({
+  axis,
+  result,
+}: {
+  axis: MbtiAxisId;
+  result: MbtiOutput["axes"]["ei"];
+}) {
+  const labels = MBTI_AXIS_LABELS[axis];
+  const poles: Record<MbtiAxisId, [string, string]> = {
+    ei: ["I", "E"],
+    sn: ["S", "N"],
+    tf: ["T", "F"],
+    jp: ["J", "P"],
+  };
+  const [negPole, posPole] = poles[axis];
+  const pct = (result.normalized + 100) / 2; // 0..100 where 50 is center
+  const active = result.pole;
+  const activeIsPos = active === posPole;
+
+  return (
+    <div>
+      <div className="mb-1 flex items-baseline justify-between text-[11px]">
+        <span
+          className={`flex items-baseline gap-1 ${activeIsPos ? "text-neutral-400" : "text-neutral-900"}`}
+        >
+          <span className="font-mono text-[10px]">{negPole}</span>
+          <span className="text-neutral-500">{labels.negative}</span>
+        </span>
+        <span
+          className={`flex items-baseline gap-1 ${activeIsPos ? "text-neutral-900" : "text-neutral-400"}`}
+        >
+          <span className="text-neutral-500">{labels.positive}</span>
+          <span className="font-mono text-[10px]">{posPole}</span>
+        </span>
+      </div>
+      <div className="relative h-6 overflow-hidden rounded-md bg-neutral-100">
+        {/* Center tick */}
+        <div className="absolute inset-y-0 left-1/2 w-px bg-neutral-300" />
+        {/* Fill */}
+        <div
+          className="absolute inset-y-0 bg-[--color-accent-500]/80 transition-all"
+          style={{
+            left: activeIsPos ? "50%" : `${pct}%`,
+            width: activeIsPos ? `${pct - 50}%` : `${50 - pct}%`,
+          }}
+        />
+        {/* Marker */}
+        <div
+          className="absolute top-1/2 h-4 w-[3px] -translate-y-1/2 -translate-x-1/2 rounded-sm bg-[--color-accent-700]"
+          style={{ left: `${pct}%` }}
+        />
+        {/* Label */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span
+            className="text-[10px] tabular-nums text-neutral-600"
+            style={{ fontFamily: MONO }}
+          >
+            {result.normalized >= 0 ? "+" : ""}
+            {result.normalized.toFixed(0)} · {result.confidence}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
