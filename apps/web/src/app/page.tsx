@@ -1,7 +1,6 @@
 import { compute } from "@bonyeon/engine-manseryeok";
 
 export default function HomePage() {
-  // 데모용 샘플 입력: 1990-12-09 13:00 KST, 서울
   const demo = compute({
     date: { year: 1990, month: 12, day: 9 },
     time: { hour: 13, minute: 0 },
@@ -10,143 +9,330 @@ export default function HomePage() {
     conventions: { jasi: "unified", yearBoundary: "ipchun", useTrueSolarTime: false },
   });
 
-  const pillar = (p: typeof demo.pillars.year) =>
-    `${p.stem.han}${p.branch.han} (${p.stem.kr}${p.branch.kr})`;
-
   const engines = [
-    { key: "사주", desc: "천간·지지 네 기둥으로 본 원국", status: "v0.1 구현 완료" },
-    { key: "자미두수", desc: "12궁 14주성 명반", status: "스펙 완료 · 구현 예정" },
-    { key: "48주 원형", desc: "황도를 48로 나눈 생일 원형", status: "스펙 완료 · 구현 예정" },
-    { key: "성향 4축", desc: "에너지·인식·판단·생활양식 자가 진단", status: "스펙 완료 · 구현 예정" },
-    { key: "내면 동기", desc: "9유형 원형 + 윙", status: "스펙 완료 · 구현 예정" },
+    {
+      kr: "사주",
+      han: "四柱",
+      en: "Four Pillars",
+      desc: "천간·지지로 읽는 원국(原局). 운명론의 동양적 근원.",
+      status: "v0.1 구현 완료",
+      built: true,
+    },
+    {
+      kr: "자미두수",
+      han: "紫微斗數",
+      en: "Zi Wei Dou Shu",
+      desc: "12궁에 14주성을 배치해 삶의 영역별 경향을 읽습니다.",
+      status: "구현 예정 · P2 W3",
+      built: false,
+    },
+    {
+      kr: "48주 원형",
+      han: "—",
+      en: "Solar Archetypes",
+      desc: "태양 황경을 48주로 나눈 서양 원형 체계.",
+      status: "구현 예정 · P2 W4",
+      built: false,
+    },
+    {
+      kr: "4축 성향",
+      han: "—",
+      en: "Four-Axis Persona",
+      desc: "에너지·인식·판단·생활양식. 공식 MBTI와 별개 자체 문항.",
+      status: "구현 예정 · P2 W4",
+      built: false,
+    },
+    {
+      kr: "내면 동기",
+      han: "—",
+      en: "Enneagram",
+      desc: "9유형과 윙, 본능·감정·사고 트라이어드.",
+      status: "구현 예정 · P2 W5",
+      built: false,
+    },
   ];
 
-  return (
-    <main className="mx-auto max-w-3xl px-6 py-20">
-      {/* Header */}
-      <header className="mb-16">
-        <p className="mb-3 text-sm uppercase tracking-widest text-neutral-500">
-          BONYEON · 본연(本然)
-        </p>
-        <h1
-          className="mb-6 text-5xl leading-tight font-normal tracking-tight md:text-6xl"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          다섯 체계로 비추는
-          <br />
-          <em className="not-italic text-accent-500">본연</em>.
-        </h1>
-        <p className="max-w-xl text-lg text-neutral-700">
-          사주·자미두수·48주 원형·성향·내면 동기. 서로 다른 다섯 관점이 한 사람을
-          어떻게 겹쳐 설명하는지 읽습니다. 운세가 아니라 자기 이해.
-        </p>
-      </header>
+  const pillarLabels = {
+    year: { kr: "연주", han: "年" },
+    month: { kr: "월주", han: "月" },
+    day: { kr: "일주", han: "日" },
+    hour: { kr: "시주", han: "時" },
+  } as const;
 
-      {/* Engine list */}
-      <section className="mb-16">
-        <h2 className="mb-6 text-xs uppercase tracking-widest text-neutral-500">
-          다섯 원리
-        </h2>
-        <div className="border-t border-neutral-200">
-          {engines.map((e) => (
-            <div
-              key={e.key}
-              className="flex flex-col gap-1 border-b border-neutral-200 py-4 md:flex-row md:items-baseline md:justify-between"
-            >
-              <div className="flex items-baseline gap-4">
-                <span
-                  className="text-lg font-medium"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  {e.key}
-                </span>
-                <span className="text-sm text-neutral-500">{e.desc}</span>
-              </div>
-              <span className="text-xs uppercase tracking-wider text-accent-700">
-                {e.status}
-              </span>
-            </div>
-          ))}
+  const serifStack = `"Apple SD Gothic Neo", "Noto Serif KR", "Nanum Myeongjo", "Yu Mincho", "Songti SC", serif`;
+
+  return (
+    <div className="min-h-screen antialiased">
+      {/* ── Fixed top nav ───────────────────────────────────── */}
+      <nav className="fixed inset-x-0 top-0 z-40 border-b border-neutral-200/60 bg-[--color-neutral-50]/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 md:px-10">
+          <div className="flex items-baseline gap-2 text-sm">
+            <span className="font-medium tracking-tight" style={{ fontFamily: serifStack }}>
+              本然
+            </span>
+            <span className="text-neutral-400">·</span>
+            <span className="font-mono text-xs tracking-wider text-neutral-500">BONYEON</span>
+          </div>
+          <a
+            href="https://github.com/exsucut/BONYEON"
+            className="text-xs uppercase tracking-[0.2em] text-neutral-500 transition-colors hover:text-[--color-accent-700]"
+          >
+            Source ↗
+          </a>
+        </div>
+      </nav>
+
+      {/* ── Hero ───────────────────────────────────────────── */}
+      <section className="relative isolate overflow-hidden px-6 pb-28 pt-36 md:px-10 md:pt-48 md:pb-40">
+        {/* 本 ornament */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-[2vw] top-6 select-none text-[40vw] leading-none text-[--color-neutral-100] md:top-4 md:text-[32rem]"
+          style={{ fontFamily: serifStack, fontWeight: 300 }}
+        >
+          本
+        </div>
+
+        <div className="relative mx-auto max-w-6xl">
+          <div className="mb-10 flex items-center gap-4 text-[11px] uppercase tracking-[0.25em] text-neutral-500">
+            <span className="font-mono">001</span>
+            <span className="h-px flex-none w-12 bg-neutral-300" />
+            <span>Origin Document · 2026</span>
+          </div>
+
+          <h1
+            className="mb-10 max-w-4xl text-4xl font-normal leading-[1.05] tracking-tight md:text-7xl lg:text-[5.5rem]"
+            style={{ fontFamily: serifStack }}
+          >
+            다섯 관점으로,
+            <br />한 사람을 겹쳐 읽는 법.
+          </h1>
+
+          <p className="mb-12 max-w-xl text-lg leading-relaxed text-neutral-700 md:text-xl">
+            사주·자미두수·48주·성향·내면 동기. 각자의 언어를 섞지 않고 나란히 놓습니다.
+            운세가 아닌 자기 이해.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
+            <span className="flex items-center gap-2">
+              <span className="inline-block size-1.5 rounded-full bg-[--color-accent-500]" />
+              Closed beta · July 2026
+            </span>
+            <span className="hidden h-4 w-px bg-neutral-300 md:inline-block" />
+            <span className="font-mono tracking-wider">v0.1.0</span>
+          </div>
         </div>
       </section>
 
-      {/* Live demo */}
-      <section className="mb-16">
-        <h2 className="mb-2 text-xs uppercase tracking-widest text-neutral-500">
-          Live demo — 만세력 엔진 v0.1
-        </h2>
-        <p className="mb-6 text-sm text-neutral-500">
-          입력: 1990-12-09 13:00 KST (서울). 서버 컴포넌트에서 엔진이 직접 실행됩니다.
-        </p>
+      {/* ── Manifesto ──────────────────────────────────────── */}
+      <section className="border-t border-neutral-200 px-6 md:px-10">
+        <div className="mx-auto grid max-w-6xl gap-8 py-16 md:grid-cols-12 md:py-24">
+          <h2 className="text-[11px] uppercase tracking-[0.25em] text-neutral-500 md:col-span-3">
+            § Manifesto
+          </h2>
+          <div className="space-y-6 text-lg leading-relaxed text-neutral-700 md:col-span-8 md:text-xl">
+            <p>
+              <span
+                className="float-left mr-2 text-5xl leading-none text-[--color-accent-500] md:text-6xl"
+                style={{ fontFamily: serifStack }}
+              >
+                본
+              </span>
+              연(本然)은 "본디 그러한 것" 그대로를 말합니다. 사람이 태어날 때 받은 구도,
+              그 위에 자라난 성향의 결. 우리는 그것을 다섯 개의 언어로 읽습니다.
+            </p>
+            <p>
+              사주와 자미두수는 시간의 좌표를 돌려 사람을 배치합니다. 서양의 세 체계는
+              내면의 축으로 사람을 기술합니다. 어느 하나가 최종 해석이 아니므로, 우리는
+              단정하지 않습니다.
+            </p>
+            <p className="text-neutral-500">
+              결과는 조언도, 예언도 아닙니다. 다섯 거울이 동시에 비추는 한 사람의 그림자,
+              그 이상도 이하도.
+            </p>
+          </div>
+        </div>
+      </section>
 
-        <div
-          className="rounded-sm border border-neutral-200 bg-neutral-25 p-6 shadow-sm"
-          style={{ backgroundColor: "var(--color-neutral-25)" }}
-        >
-          <div className="mb-4 grid grid-cols-4 gap-4 border-b border-neutral-200 pb-4">
+      {/* ── Systems ────────────────────────────────────────── */}
+      <section className="border-t border-neutral-200 px-6 md:px-10">
+        <div className="mx-auto max-w-6xl py-16 md:py-24">
+          <div className="mb-10 grid gap-8 md:grid-cols-12">
+            <h2 className="text-[11px] uppercase tracking-[0.25em] text-neutral-500 md:col-span-3">
+              § The Five Systems
+            </h2>
+            <p className="text-neutral-600 md:col-span-8">
+              다섯은 병렬이며 교환되지 않습니다. 동양은 동양끼리, 서양은 서양끼리. 교차
+              인사이트는 따로 마련된 섹션에서만 이루어집니다.
+            </p>
+          </div>
+
+          <ol>
+            {engines.map((e, i) => (
+              <li
+                key={e.kr}
+                className="grid grid-cols-12 gap-4 border-t border-neutral-200 py-8 md:py-10"
+              >
+                <span className="col-span-2 pt-1 font-mono text-xs tabular-nums text-neutral-400 md:col-span-1">
+                  0{i + 1}
+                </span>
+                <div className="col-span-10 md:col-span-6">
+                  <h3
+                    className="mb-1 text-3xl leading-tight tracking-tight md:text-4xl"
+                    style={{ fontFamily: serifStack }}
+                  >
+                    {e.kr}
+                    {e.han !== "—" && (
+                      <span className="ml-3 text-xl text-neutral-400 md:text-2xl">{e.han}</span>
+                    )}
+                  </h3>
+                  <p className="mt-2 max-w-lg text-neutral-600">{e.desc}</p>
+                </div>
+                <div className="col-span-12 flex md:col-span-5 md:justify-end md:self-end">
+                  <span
+                    className={`inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] ${
+                      e.built ? "text-[--color-accent-700]" : "text-neutral-400"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block size-1.5 rounded-full ${
+                        e.built ? "bg-[--color-accent-500]" : "bg-neutral-300"
+                      }`}
+                    />
+                    {e.status}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* ── Live demo ──────────────────────────────────────── */}
+      <section className="border-t border-neutral-300 bg-[--color-neutral-25] px-6 md:px-10">
+        <div className="mx-auto max-w-6xl py-20 md:py-32">
+          <div className="mb-14 grid gap-8 md:grid-cols-12">
+            <h2 className="text-[11px] uppercase tracking-[0.25em] text-neutral-500 md:col-span-3">
+              § Live Reading
+            </h2>
+            <div className="md:col-span-8">
+              <p className="text-neutral-700">
+                아래 네 기둥은 <span className="text-[--color-accent-700]">서버에서 실시간 계산</span>됩니다.
+                만세력 엔진 v0.1.0 · Meeus 천문 알고리즘 기반.
+              </p>
+              <p className="mt-3 font-mono text-xs uppercase tracking-wider text-neutral-500">
+                INPUT · 1990-12-09 13:00 KST · 서울 37.57°N 126.98°E
+              </p>
+            </div>
+          </div>
+
+          {/* 4 pillars big hanja */}
+          <div className="grid grid-cols-4 gap-px overflow-hidden rounded-sm border border-neutral-300 bg-neutral-300">
             {(["year", "month", "day", "hour"] as const).map((k) => {
               const p = demo.pillars[k];
-              const label = { year: "연주", month: "월주", day: "일주", hour: "시주" }[k];
+              const lbl = pillarLabels[k];
               return (
-                <div key={k}>
-                  <div className="mb-1 text-xs text-neutral-500">{label}</div>
-                  <div
-                    className="text-2xl"
-                    style={{ fontFamily: "var(--font-display)" }}
-                  >
-                    {p ? pillar(p) : "—"}
+                <div
+                  key={k}
+                  className="flex min-h-[14rem] flex-col items-center justify-between gap-4 bg-[--color-neutral-25] px-2 py-8 md:min-h-[18rem] md:py-12"
+                >
+                  <div className="text-[10px] uppercase tracking-[0.25em] text-neutral-400">
+                    {lbl.kr} · {lbl.han}
                   </div>
+                  {p ? (
+                    <>
+                      <div
+                        className="text-5xl leading-none md:text-[6.5rem]"
+                        style={{ fontFamily: serifStack, letterSpacing: "-0.02em" }}
+                      >
+                        {p.stem.han}
+                        {p.branch.han}
+                      </div>
+                      <div className="font-mono text-[10px] tracking-wider text-neutral-500">
+                        {p.stem.kr}
+                        {p.branch.kr}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-4xl text-neutral-300">—</div>
+                  )}
                 </div>
               );
             })}
           </div>
 
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-            <div className="flex justify-between border-b border-neutral-100 py-1">
-              <dt className="text-neutral-500">납음(일주)</dt>
-              <dd>{demo.napeum.day}</dd>
-            </div>
-            <div className="flex justify-between border-b border-neutral-100 py-1">
-              <dt className="text-neutral-500">공망(일주 기준)</dt>
-              <dd>
-                {demo.kongmang.byDay[0].han}·{demo.kongmang.byDay[1].han}
-              </dd>
-            </div>
-            <div className="flex justify-between border-b border-neutral-100 py-1">
-              <dt className="text-neutral-500">직전 절기</dt>
-              <dd>{demo.trace.solarTerms.previousMajor.name}</dd>
-            </div>
-            <div className="flex justify-between border-b border-neutral-100 py-1">
-              <dt className="text-neutral-500">태양 황경</dt>
-              <dd>{demo.trace.solarTerms.solarLongitudeAtBirth.toFixed(3)}°</dd>
-            </div>
+          {/* Metadata table */}
+          <dl className="mt-10 grid grid-cols-1 gap-x-10 md:grid-cols-2">
+            {[
+              ["납음 (일주)", demo.napeum.day],
+              [
+                "공망 (일주 기준)",
+                `${demo.kongmang.byDay[0].han}·${demo.kongmang.byDay[1].han} (${demo.kongmang.byDay[0].kr}·${demo.kongmang.byDay[1].kr})`,
+              ],
+              ["직전 절기", demo.trace.solarTerms.previousMajor.name],
+              [
+                "태양 황경",
+                `${demo.trace.solarTerms.solarLongitudeAtBirth.toFixed(3)}°`,
+              ],
+              ["JDN (일주 기준일)", demo.trace.pillarDecisions.day.jdn.toString()],
+              [
+                "입춘 기준 연도",
+                demo.trace.pillarDecisions.year.effectiveYear.toString(),
+              ],
+            ].map(([k, v]) => (
+              <div
+                key={k}
+                className="flex items-baseline justify-between gap-4 border-b border-neutral-200 py-3"
+              >
+                <dt className="text-[11px] uppercase tracking-[0.2em] text-neutral-500">{k}</dt>
+                <dd
+                  className="font-mono text-sm tabular-nums text-neutral-900"
+                  style={{ letterSpacing: "0.02em" }}
+                >
+                  {v}
+                </dd>
+              </div>
+            ))}
           </dl>
 
           {demo.trace.warnings.length > 0 && (
-            <div className="mt-4 rounded-sm bg-neutral-100 p-3 text-xs text-neutral-700">
-              <div className="mb-1 font-medium">v0.1 제약:</div>
-              <ul className="ml-4 list-disc space-y-0.5">
+            <details className="mt-10 border-t border-neutral-200 pt-6">
+              <summary className="cursor-pointer text-[11px] uppercase tracking-[0.25em] text-neutral-500 hover:text-[--color-accent-700]">
+                v0.1 제약 ({demo.trace.warnings.length})
+              </summary>
+              <ul className="mt-4 space-y-2 text-sm text-neutral-600">
                 {demo.trace.warnings.map((w, i) => (
-                  <li key={i}>{w}</li>
+                  <li key={i} className="flex gap-3">
+                    <span className="font-mono text-neutral-400">0{i + 1}</span>
+                    <span>{w}</span>
+                  </li>
                 ))}
               </ul>
-            </div>
+            </details>
           )}
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-neutral-200 pt-6 text-xs text-neutral-500">
-        <p className="mb-1">© 2026 BONYEON. 1인 풀스택 개발 · 베타 예정: 2026-07</p>
-        <p>
-          <a
-            className="text-accent-700 underline underline-offset-2 hover:text-accent-900"
-            href="https://github.com/exsucut/BONYEON"
-          >
-            github.com/exsucut/BONYEON
-          </a>
-        </p>
+      {/* ── Footer ─────────────────────────────────────────── */}
+      <footer className="border-t border-neutral-300 px-6 md:px-10">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 py-10 text-xs text-neutral-500 md:grid-cols-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-lg" style={{ fontFamily: serifStack }}>
+              本然
+            </span>
+            <span className="font-mono tracking-wider">BONYEON</span>
+          </div>
+          <div className="md:text-center">© 2026 · 1인 풀스택</div>
+          <div className="font-mono md:text-right">
+            <a
+              className="hover:text-[--color-accent-700]"
+              href="https://github.com/exsucut/BONYEON"
+            >
+              github.com/exsucut/BONYEON
+            </a>
+          </div>
+        </div>
       </footer>
-    </main>
+    </div>
   );
 }
