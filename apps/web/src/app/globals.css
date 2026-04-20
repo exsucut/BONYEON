@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  /* Primitive tokens — docs/71-design-system §2.1 Oatmeal + §2.2 Terracotta */
+  --color-neutral-25: #fafaf7;
+  --color-neutral-50: #f5f2eb;
+  --color-neutral-900: #1a1814;
+
+  --color-accent-500: #c4563c;
+  --color-accent-700: #9a3e2a;
+  --color-accent-900: #6e2a1c;
+
+  /* Semantic */
+  --color-bg: var(--color-neutral-50);
+  --color-ink: var(--color-neutral-900);
+  --color-link: var(--color-accent-700);
+}
+
+html,
+body {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: "Pretendard Variable", system-ui, -apple-system, sans-serif;
+}
