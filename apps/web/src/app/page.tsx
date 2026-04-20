@@ -1,57 +1,392 @@
-import { compute } from "@bonyeon/engine-manseryeok";
+"use client";
 
-export default function HomePage() {
-  const demo = compute({
-    date: { year: 1990, month: 12, day: 9 },
-    time: { hour: 13, minute: 0 },
+import {
+  compute,
+  type JasiConvention,
+  type ManseryeokOutput,
+} from "@bonyeon/engine-manseryeok";
+import { useMemo, useState } from "react";
+
+type FormState = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  timeUnknown: boolean;
+  gender: "male" | "female";
+  calendarType: "solar" | "lunar";
+  jasi: JasiConvention;
+};
+
+type TabKey = "saju" | "ziwei" | "g48" | "axis" | "ennea" | "cross";
+
+const TABS: ReadonlyArray<{ key: TabKey; kr: string; han: string; built: boolean }> = [
+  { key: "saju", kr: "사주", han: "四柱", built: true },
+  { key: "ziwei", kr: "자미두수", han: "紫微", built: false },
+  { key: "g48", kr: "48주", han: "週", built: false },
+  { key: "axis", kr: "4축 성향", han: "軸", built: false },
+  { key: "ennea", kr: "내면 동기", han: "九", built: false },
+  { key: "cross", kr: "교차 인사이트", han: "×", built: false },
+];
+
+const SERIF = `"Apple SD Gothic Neo", "Noto Serif KR", "Nanum Myeongjo", "Yu Mincho", serif`;
+
+export default function App() {
+  const [form, setForm] = useState<FormState>({
+    year: 1990,
+    month: 12,
+    day: 9,
+    hour: 13,
+    minute: 0,
+    timeUnknown: false,
+    gender: "male",
     calendarType: "solar",
-    location: { longitude: 126.978, latitude: 37.5665, cityName: "서울" },
-    conventions: { jasi: "unified", yearBoundary: "ipchun", useTrueSolarTime: false },
+    jasi: "unified",
   });
 
-  const engines = [
-    {
-      kr: "사주",
-      han: "四柱",
-      en: "Four Pillars",
-      desc: "천간·지지로 읽는 원국(原局). 운명론의 동양적 근원.",
-      status: "v0.1 구현 완료",
-      built: true,
-    },
-    {
-      kr: "자미두수",
-      han: "紫微斗數",
-      en: "Zi Wei Dou Shu",
-      desc: "12궁에 14주성을 배치해 삶의 영역별 경향을 읽습니다.",
-      status: "구현 예정 · P2 W3",
-      built: false,
-    },
-    {
-      kr: "48주 원형",
-      han: "—",
-      en: "Solar Archetypes",
-      desc: "태양 황경을 48주로 나눈 서양 원형 체계.",
-      status: "구현 예정 · P2 W4",
-      built: false,
-    },
-    {
-      kr: "4축 성향",
-      han: "—",
-      en: "Four-Axis Persona",
-      desc: "에너지·인식·판단·생활양식. 공식 MBTI와 별개 자체 문항.",
-      status: "구현 예정 · P2 W4",
-      built: false,
-    },
-    {
-      kr: "내면 동기",
-      han: "—",
-      en: "Enneagram",
-      desc: "9유형과 윙, 본능·감정·사고 트라이어드.",
-      status: "구현 예정 · P2 W5",
-      built: false,
-    },
-  ];
+  const [tab, setTab] = useState<TabKey>("saju");
+  const [traceOpen, setTraceOpen] = useState(false);
 
+  const result: ManseryeokOutput | null = useMemo(() => {
+    try {
+      return compute({
+        date: { year: form.year, month: form.month, day: form.day },
+        time: form.timeUnknown ? null : { hour: form.hour, minute: form.minute },
+        calendarType: form.calendarType,
+        location: { longitude: 126.978, latitude: 37.5665, cityName: "서울" },
+        conventions: { jasi: form.jasi, yearBoundary: "ipchun", useTrueSolarTime: false },
+      });
+    } catch {
+      return null;
+    }
+  }, [form]);
+
+  const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  return (
+    <div className="flex h-screen flex-col bg-[--color-neutral-50] antialiased">
+      {/* ── Top bar ───────────────────────────────── */}
+      <header className="flex h-14 flex-none items-center justify-between border-b border-neutral-200 bg-[--color-neutral-25] px-4 md:px-6">
+        <div className="flex items-baseline gap-2">
+          <span
+            className="text-lg font-medium leading-none"
+            style={{ fontFamily: SERIF }}
+          >
+            本然
+          </span>
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500">
+            BONYEON
+          </span>
+          <span className="ml-3 hidden rounded-full bg-[--color-accent-500]/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-[--color-accent-700] sm:inline-block">
+            v0.1.0
+          </span>
+        </div>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            className="text-xs text-neutral-600 hover:text-neutral-900"
+          >
+            저장된 프로필
+          </button>
+          <a
+            href="https://github.com/exsucut/BONYEON"
+            className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 hover:text-[--color-accent-700]"
+          >
+            Source ↗
+          </a>
+        </div>
+      </header>
+
+      {/* ── Main grid ─────────────────────────────── */}
+      <div className="grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-[320px_1fr]">
+        {/* Sidebar: input */}
+        <aside className="overflow-y-auto border-b border-neutral-200 bg-[--color-neutral-25] px-5 py-6 md:border-b-0 md:border-r">
+          <InputPanel form={form} onChange={updateForm} />
+        </aside>
+
+        {/* Main: report */}
+        <main className="overflow-y-auto">
+          {result ? (
+            <ReportView
+              result={result}
+              tab={tab}
+              onTabChange={setTab}
+              traceOpen={traceOpen}
+              onTraceToggle={() => setTraceOpen((v) => !v)}
+              profileSummary={profileSummary(form)}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center p-8 text-sm text-neutral-500">
+              입력을 확인해주세요.
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+
+function profileSummary(f: FormState): string {
+  const genderKr = f.gender === "male" ? "남자" : "여자";
+  const calKr = f.calendarType === "solar" ? "양력" : "음력";
+  const date = `${f.year}.${String(f.month).padStart(2, "0")}.${String(f.day).padStart(2, "0")}`;
+  const time = f.timeUnknown
+    ? "시간 모름"
+    : `${String(f.hour).padStart(2, "0")}:${String(f.minute).padStart(2, "0")}`;
+  return `${calKr} · ${date} · ${time} · ${genderKr}`;
+}
+
+// ─────────────────────────────────────────────────────────────
+
+function InputPanel({
+  form,
+  onChange,
+}: {
+  form: FormState;
+  onChange: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="mb-1 font-mono text-[10px] uppercase tracking-[0.25em] text-neutral-500">
+          § Input
+        </h2>
+        <p className="text-xs text-neutral-500">
+          변경 시 즉시 재계산됩니다.
+        </p>
+      </div>
+
+      {/* Calendar type + gender */}
+      <Field label="달력">
+        <SegControl
+          value={form.calendarType}
+          options={[
+            { value: "solar", label: "양력" },
+            { value: "lunar", label: "음력" },
+          ]}
+          onChange={(v) => onChange("calendarType", v as "solar" | "lunar")}
+        />
+      </Field>
+
+      <Field label="성별">
+        <SegControl
+          value={form.gender}
+          options={[
+            { value: "male", label: "남자" },
+            { value: "female", label: "여자" },
+          ]}
+          onChange={(v) => onChange("gender", v as "male" | "female")}
+        />
+      </Field>
+
+      {/* Date */}
+      <div>
+        <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500">
+          생년월일
+        </label>
+        <div className="grid grid-cols-[1.4fr_1fr_1fr] gap-2">
+          <NumInput
+            value={form.year}
+            onChange={(v) => onChange("year", v)}
+            min={1900}
+            max={2100}
+            suffix="년"
+          />
+          <NumInput
+            value={form.month}
+            onChange={(v) => onChange("month", Math.min(12, Math.max(1, v)))}
+            min={1}
+            max={12}
+            suffix="월"
+          />
+          <NumInput
+            value={form.day}
+            onChange={(v) => onChange("day", Math.min(31, Math.max(1, v)))}
+            min={1}
+            max={31}
+            suffix="일"
+          />
+        </div>
+      </div>
+
+      {/* Time */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <label className="block font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500">
+            출생 시간
+          </label>
+          <label className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+            <input
+              type="checkbox"
+              checked={form.timeUnknown}
+              onChange={(e) => onChange("timeUnknown", e.target.checked)}
+              className="accent-[--color-accent-500]"
+            />
+            모름
+          </label>
+        </div>
+        <div
+          className={`grid grid-cols-2 gap-2 ${form.timeUnknown ? "opacity-40" : ""}`}
+        >
+          <NumInput
+            value={form.hour}
+            onChange={(v) => onChange("hour", Math.min(23, Math.max(0, v)))}
+            min={0}
+            max={23}
+            suffix="시"
+            disabled={form.timeUnknown}
+          />
+          <NumInput
+            value={form.minute}
+            onChange={(v) => onChange("minute", Math.min(59, Math.max(0, v)))}
+            min={0}
+            max={59}
+            suffix="분"
+            disabled={form.timeUnknown}
+          />
+        </div>
+      </div>
+
+      {/* Jasi convention */}
+      <Field label="자시 관례">
+        <select
+          value={form.jasi}
+          onChange={(e) => onChange("jasi", e.target.value as JasiConvention)}
+          className="w-full rounded-sm border border-neutral-300 bg-[--color-neutral-25] px-3 py-2 text-sm outline-none transition-colors focus:border-[--color-accent-500]"
+        >
+          <option value="unified">통일 자시 (23:00 기준)</option>
+          <option value="split">야자시·조자시 분리</option>
+          <option value="offset30">30분 오프셋</option>
+        </select>
+      </Field>
+
+      {/* Meta */}
+      <div className="border-t border-neutral-200 pt-4 text-[11px] text-neutral-500">
+        <div className="mb-1">
+          출생지: <span className="font-mono">서울</span>{" "}
+          <span className="text-neutral-400">(고정, v0.2에서 선택)</span>
+        </div>
+        <div>
+          <span className="font-mono">KST +09:00</span>{" "}
+          <span className="text-neutral-400">· 표준시 · 진태양시 보정 없음</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+
+function ReportView({
+  result,
+  tab,
+  onTabChange,
+  traceOpen,
+  onTraceToggle,
+  profileSummary,
+}: {
+  result: ManseryeokOutput;
+  tab: TabKey;
+  onTabChange: (t: TabKey) => void;
+  traceOpen: boolean;
+  onTraceToggle: () => void;
+  profileSummary: string;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      {/* Hero summary */}
+      <section className="border-b border-neutral-200 bg-[--color-neutral-25] px-6 py-6 md:px-10 md:py-8">
+        <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.25em] text-neutral-500">
+          프로필
+        </div>
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+          <h1
+            className="text-3xl tracking-tight md:text-4xl"
+            style={{ fontFamily: SERIF }}
+          >
+            {(["year", "month", "day", "hour"] as const)
+              .map((k) => {
+                const p = result.pillars[k];
+                return p ? `${p.stem.han}${p.branch.han}` : "—";
+              })
+              .join(" ")}
+          </h1>
+          <span className="font-mono text-xs text-neutral-500">{profileSummary}</span>
+        </div>
+      </section>
+
+      {/* Tabs */}
+      <nav className="flex-none overflow-x-auto border-b border-neutral-200 bg-[--color-neutral-25] px-4 md:px-10">
+        <div className="flex gap-0 whitespace-nowrap">
+          {TABS.map((t) => {
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => onTabChange(t.key)}
+                className={`relative flex items-baseline gap-2 border-b-2 px-3 py-3 text-sm transition-colors ${
+                  active
+                    ? "border-[--color-accent-500] text-neutral-900"
+                    : "border-transparent text-neutral-500 hover:text-neutral-900"
+                }`}
+              >
+                <span>{t.kr}</span>
+                <span
+                  className="text-[11px] text-neutral-400"
+                  style={{ fontFamily: SERIF }}
+                >
+                  {t.han}
+                </span>
+                {!t.built && (
+                  <span className="ml-1 rounded-sm bg-neutral-200 px-1 py-0.5 font-mono text-[9px] uppercase text-neutral-500">
+                    soon
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Content */}
+      <section className="flex-1 overflow-y-auto">
+        {tab === "saju" ? (
+          <SajuPanel result={result} />
+        ) : (
+          <NotReadyPanel tab={tab} />
+        )}
+
+        {/* Trace drawer */}
+        <div className="border-t border-neutral-200">
+          <button
+            type="button"
+            onClick={onTraceToggle}
+            className="flex w-full items-center justify-between px-6 py-3 text-left font-mono text-[11px] uppercase tracking-[0.2em] text-neutral-500 transition-colors hover:bg-neutral-100 md:px-10"
+          >
+            <span>
+              § Trace · 계산 근거{" "}
+              <span className="ml-2 text-neutral-400">
+                ({result.trace.warnings.length} warnings)
+              </span>
+            </span>
+            <span className="text-neutral-400">{traceOpen ? "▲" : "▼"}</span>
+          </button>
+          {traceOpen && <TracePanel result={result} />}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+
+function SajuPanel({ result }: { result: ManseryeokOutput }) {
   const pillarLabels = {
     year: { kr: "연주", han: "年" },
     month: { kr: "월주", han: "月" },
@@ -59,280 +394,360 @@ export default function HomePage() {
     hour: { kr: "시주", han: "時" },
   } as const;
 
-  const serifStack = `"Apple SD Gothic Neo", "Noto Serif KR", "Nanum Myeongjo", "Yu Mincho", "Songti SC", serif`;
+  return (
+    <div className="px-6 py-8 md:px-10 md:py-10">
+      {/* Four pillars grid */}
+      <div className="mb-10 grid grid-cols-4 gap-px overflow-hidden rounded-sm border border-neutral-300 bg-neutral-300">
+        {(["year", "month", "day", "hour"] as const).map((k) => {
+          const p = result.pillars[k];
+          const lbl = pillarLabels[k];
+          const stems = result.hiddenStems[k];
+          return (
+            <div
+              key={k}
+              className="flex min-h-[12rem] flex-col justify-between gap-3 bg-[--color-neutral-25] p-3 md:min-h-[16rem] md:p-5"
+            >
+              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-400">
+                {lbl.kr} · {lbl.han}
+              </div>
+              {p ? (
+                <div className="flex flex-col items-center">
+                  <div
+                    className="text-4xl leading-none md:text-6xl"
+                    style={{ fontFamily: SERIF, letterSpacing: "-0.02em" }}
+                  >
+                    {p.stem.han}
+                    {p.branch.han}
+                  </div>
+                  <div className="mt-2 font-mono text-[10px] tracking-wider text-neutral-500">
+                    {p.stem.kr}
+                    {p.branch.kr}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center text-3xl text-neutral-300">
+                  —
+                </div>
+              )}
+              {/* 지장간 miniature */}
+              <div className="flex flex-wrap items-center justify-center gap-1">
+                {stems?.map((hs, i) => (
+                  <span
+                    key={i}
+                    className="rounded-sm bg-neutral-100 px-1.5 py-0.5 font-mono text-[10px] text-neutral-600"
+                    title={`${hs.type} · ${hs.days}일`}
+                  >
+                    {hs.stem.han}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Cards */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <Card label="납음 (일주)" value={result.napeum.day} serif />
+        <Card
+          label="공망 (일주 기준)"
+          value={`${result.kongmang.byDay[0].han}·${result.kongmang.byDay[1].han}`}
+          sub={`${result.kongmang.byDay[0].kr}·${result.kongmang.byDay[1].kr}`}
+          serif
+        />
+        <Card
+          label="직전 절기"
+          value={result.trace.solarTerms.previousMajor.name}
+          sub={new Date(result.trace.solarTerms.previousMajor.utc)
+            .toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" })
+            .replace(" 오전", "")
+            .replace(" 오후", "")}
+        />
+        <Card
+          label="다음 절기"
+          value={result.trace.solarTerms.nextMajor.name}
+          sub={new Date(result.trace.solarTerms.nextMajor.utc)
+            .toLocaleString("ko-KR", { dateStyle: "medium" })}
+        />
+        <Card
+          label="태양 황경"
+          value={`${result.trace.solarTerms.solarLongitudeAtBirth.toFixed(3)}°`}
+          mono
+        />
+        <Card
+          label="JDN (일주 기준일)"
+          value={result.trace.pillarDecisions.day.jdn.toString()}
+          sub={`${result.trace.pillarDecisions.day.referenceAnchor.pillar} 기준`}
+          mono
+        />
+      </div>
+
+      {/* 오행 요약 */}
+      <div className="mt-8 rounded-sm border border-neutral-200 bg-[--color-neutral-25] p-5">
+        <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.25em] text-neutral-500">
+          § 오행 분포 (4기둥 간·지)
+        </div>
+        <OhaengBar result={result} />
+      </div>
+    </div>
+  );
+}
+
+function OhaengBar({ result }: { result: ManseryeokOutput }) {
+  const tally: Record<string, number> = { 목: 0, 화: 0, 토: 0, 금: 0, 수: 0 };
+  for (const key of ["year", "month", "day", "hour"] as const) {
+    const p = result.pillars[key];
+    if (!p) continue;
+    tally[p.stem.element] = (tally[p.stem.element] ?? 0) + 1;
+    tally[p.branch.element] = (tally[p.branch.element] ?? 0) + 1;
+  }
+  const total = Object.values(tally).reduce((a, b) => a + b, 0);
+  const colors: Record<string, string> = {
+    목: "#5B7760",
+    화: "#A64A3E",
+    토: "#A88B5B",
+    금: "#B5B2A8",
+    수: "#2E3B4E",
+  };
 
   return (
-    <div className="min-h-screen antialiased">
-      {/* ── Fixed top nav ───────────────────────────────────── */}
-      <nav className="fixed inset-x-0 top-0 z-40 border-b border-neutral-200/60 bg-[--color-neutral-50]/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 md:px-10">
-          <div className="flex items-baseline gap-2 text-sm">
-            <span className="font-medium tracking-tight" style={{ fontFamily: serifStack }}>
-              本然
+    <div>
+      <div className="mb-2 flex h-3 overflow-hidden rounded-sm bg-neutral-100">
+        {(["목", "화", "토", "금", "수"] as const).map((el) => {
+          const n = tally[el] ?? 0;
+          if (n === 0) return null;
+          return (
+            <div
+              key={el}
+              style={{
+                width: `${(n / total) * 100}%`,
+                backgroundColor: colors[el],
+              }}
+              title={`${el} ${n}`}
+            />
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs">
+        {(["목", "화", "토", "금", "수"] as const).map((el) => (
+          <div key={el} className="flex items-center gap-1.5">
+            <span
+              className="inline-block size-2 rounded-full"
+              style={{ backgroundColor: colors[el] }}
+            />
+            <span className="text-neutral-500">{el}</span>
+            <span className="font-mono tabular-nums text-neutral-900">
+              {tally[el]}
             </span>
-            <span className="text-neutral-400">·</span>
-            <span className="font-mono text-xs tracking-wider text-neutral-500">BONYEON</span>
           </div>
-          <a
-            href="https://github.com/exsucut/BONYEON"
-            className="text-xs uppercase tracking-[0.2em] text-neutral-500 transition-colors hover:text-[--color-accent-700]"
-          >
-            Source ↗
-          </a>
-        </div>
-      </nav>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-      {/* ── Hero ───────────────────────────────────────────── */}
-      <section className="relative isolate overflow-hidden px-6 pb-28 pt-36 md:px-10 md:pt-48 md:pb-40">
-        {/* 本 ornament */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-[2vw] top-6 select-none text-[40vw] leading-none text-[--color-neutral-100] md:top-4 md:text-[32rem]"
-          style={{ fontFamily: serifStack, fontWeight: 300 }}
-        >
-          本
-        </div>
+// ─────────────────────────────────────────────────────────────
 
-        <div className="relative mx-auto max-w-6xl">
-          <div className="mb-10 flex items-center gap-4 text-[11px] uppercase tracking-[0.25em] text-neutral-500">
-            <span className="font-mono">001</span>
-            <span className="h-px flex-none w-12 bg-neutral-300" />
-            <span>Origin Document · 2026</span>
+function NotReadyPanel({ tab }: { tab: TabKey }) {
+  const info = TABS.find((t) => t.key === tab);
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 px-8 py-20 text-center">
+      <div
+        className="text-7xl leading-none text-neutral-200"
+        style={{ fontFamily: SERIF }}
+      >
+        {info?.han}
+      </div>
+      <h2 className="text-xl" style={{ fontFamily: SERIF }}>
+        {info?.kr}
+      </h2>
+      <p className="max-w-sm text-sm text-neutral-500">
+        이 엔진은 아직 구현되지 않았습니다. 명세는 완료 상태이며, 로드맵(P2)에
+        따라 순차 구현됩니다.
+      </p>
+      <a
+        href="https://github.com/exsucut/BONYEON/tree/main/docs"
+        className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.2em] text-[--color-accent-700] hover:text-[--color-accent-900]"
+      >
+        명세 보기 ↗
+      </a>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+
+function TracePanel({ result }: { result: ManseryeokOutput }) {
+  const t = result.trace;
+  return (
+    <div className="bg-[--color-neutral-25] px-6 py-5 font-mono text-xs md:px-10">
+      <div className="space-y-3 text-neutral-700">
+        <TraceRow label="입춘 UTC" value={t.pillarDecisions.year.ipchunUtc} />
+        <TraceRow
+          label="출생 vs 입춘"
+          value={t.pillarDecisions.year.birthRelativeToIpchun}
+        />
+        <TraceRow
+          label="effectiveYear"
+          value={t.pillarDecisions.year.effectiveYear.toString()}
+        />
+        <TraceRow
+          label="월주 · 지배 절기"
+          value={t.pillarDecisions.month.governingTermName}
+        />
+        <TraceRow label="오호둔" value={t.pillarDecisions.month.wuhutunRule} />
+        <TraceRow label="일주 JDN" value={t.pillarDecisions.day.jdn.toString()} />
+        <TraceRow
+          label="자시 조정"
+          value={t.pillarDecisions.day.jasiAdjustment}
+        />
+        {t.pillarDecisions.hour && (
+          <TraceRow label="오서둔" value={t.pillarDecisions.hour.wusodunRule} />
+        )}
+        <TraceRow label="태양 황경" value={`${t.solarTerms.solarLongitudeAtBirth.toFixed(5)}°`} />
+        <TraceRow label="천문 데이터" value={t.solarTerms.dataSource} />
+      </div>
+
+      {t.warnings.length > 0 && (
+        <div className="mt-5 border-t border-neutral-200 pt-4">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[--color-accent-700]">
+            Warnings · {t.warnings.length}
           </div>
-
-          <h1
-            className="mb-10 max-w-4xl text-4xl font-normal leading-[1.05] tracking-tight md:text-7xl lg:text-[5.5rem]"
-            style={{ fontFamily: serifStack }}
-          >
-            다섯 관점으로,
-            <br />한 사람을 겹쳐 읽는 법.
-          </h1>
-
-          <p className="mb-12 max-w-xl text-lg leading-relaxed text-neutral-700 md:text-xl">
-            사주·자미두수·48주·성향·내면 동기. 각자의 언어를 섞지 않고 나란히 놓습니다.
-            운세가 아닌 자기 이해.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
-            <span className="flex items-center gap-2">
-              <span className="inline-block size-1.5 rounded-full bg-[--color-accent-500]" />
-              Closed beta · July 2026
-            </span>
-            <span className="hidden h-4 w-px bg-neutral-300 md:inline-block" />
-            <span className="font-mono tracking-wider">v0.1.0</span>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Manifesto ──────────────────────────────────────── */}
-      <section className="border-t border-neutral-200 px-6 md:px-10">
-        <div className="mx-auto grid max-w-6xl gap-8 py-16 md:grid-cols-12 md:py-24">
-          <h2 className="text-[11px] uppercase tracking-[0.25em] text-neutral-500 md:col-span-3">
-            § Manifesto
-          </h2>
-          <div className="space-y-6 text-lg leading-relaxed text-neutral-700 md:col-span-8 md:text-xl">
-            <p>
-              <span
-                className="float-left mr-2 text-5xl leading-none text-[--color-accent-500] md:text-6xl"
-                style={{ fontFamily: serifStack }}
-              >
-                본
-              </span>
-              연(本然)은 "본디 그러한 것" 그대로를 말합니다. 사람이 태어날 때 받은 구도,
-              그 위에 자라난 성향의 결. 우리는 그것을 다섯 개의 언어로 읽습니다.
-            </p>
-            <p>
-              사주와 자미두수는 시간의 좌표를 돌려 사람을 배치합니다. 서양의 세 체계는
-              내면의 축으로 사람을 기술합니다. 어느 하나가 최종 해석이 아니므로, 우리는
-              단정하지 않습니다.
-            </p>
-            <p className="text-neutral-500">
-              결과는 조언도, 예언도 아닙니다. 다섯 거울이 동시에 비추는 한 사람의 그림자,
-              그 이상도 이하도.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Systems ────────────────────────────────────────── */}
-      <section className="border-t border-neutral-200 px-6 md:px-10">
-        <div className="mx-auto max-w-6xl py-16 md:py-24">
-          <div className="mb-10 grid gap-8 md:grid-cols-12">
-            <h2 className="text-[11px] uppercase tracking-[0.25em] text-neutral-500 md:col-span-3">
-              § The Five Systems
-            </h2>
-            <p className="text-neutral-600 md:col-span-8">
-              다섯은 병렬이며 교환되지 않습니다. 동양은 동양끼리, 서양은 서양끼리. 교차
-              인사이트는 따로 마련된 섹션에서만 이루어집니다.
-            </p>
-          </div>
-
-          <ol>
-            {engines.map((e, i) => (
-              <li
-                key={e.kr}
-                className="grid grid-cols-12 gap-4 border-t border-neutral-200 py-8 md:py-10"
-              >
-                <span className="col-span-2 pt-1 font-mono text-xs tabular-nums text-neutral-400 md:col-span-1">
-                  0{i + 1}
-                </span>
-                <div className="col-span-10 md:col-span-6">
-                  <h3
-                    className="mb-1 text-3xl leading-tight tracking-tight md:text-4xl"
-                    style={{ fontFamily: serifStack }}
-                  >
-                    {e.kr}
-                    {e.han !== "—" && (
-                      <span className="ml-3 text-xl text-neutral-400 md:text-2xl">{e.han}</span>
-                    )}
-                  </h3>
-                  <p className="mt-2 max-w-lg text-neutral-600">{e.desc}</p>
-                </div>
-                <div className="col-span-12 flex md:col-span-5 md:justify-end md:self-end">
-                  <span
-                    className={`inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] ${
-                      e.built ? "text-[--color-accent-700]" : "text-neutral-400"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block size-1.5 rounded-full ${
-                        e.built ? "bg-[--color-accent-500]" : "bg-neutral-300"
-                      }`}
-                    />
-                    {e.status}
-                  </span>
-                </div>
+          <ul className="space-y-1.5 text-xs text-neutral-600">
+            {t.warnings.map((w, i) => (
+              <li key={i} className="flex gap-3">
+                <span className="text-neutral-400">0{i + 1}</span>
+                <span className="font-sans">{w}</span>
               </li>
             ))}
-          </ol>
+          </ul>
         </div>
-      </section>
+      )}
+    </div>
+  );
+}
 
-      {/* ── Live demo ──────────────────────────────────────── */}
-      <section className="border-t border-neutral-300 bg-[--color-neutral-25] px-6 md:px-10">
-        <div className="mx-auto max-w-6xl py-20 md:py-32">
-          <div className="mb-14 grid gap-8 md:grid-cols-12">
-            <h2 className="text-[11px] uppercase tracking-[0.25em] text-neutral-500 md:col-span-3">
-              § Live Reading
-            </h2>
-            <div className="md:col-span-8">
-              <p className="text-neutral-700">
-                아래 네 기둥은 <span className="text-[--color-accent-700]">서버에서 실시간 계산</span>됩니다.
-                만세력 엔진 v0.1.0 · Meeus 천문 알고리즘 기반.
-              </p>
-              <p className="mt-3 font-mono text-xs uppercase tracking-wider text-neutral-500">
-                INPUT · 1990-12-09 13:00 KST · 서울 37.57°N 126.98°E
-              </p>
-            </div>
-          </div>
+function TraceRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[9rem_1fr] gap-4">
+      <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">
+        {label}
+      </span>
+      <span className="text-neutral-900">{value}</span>
+    </div>
+  );
+}
 
-          {/* 4 pillars big hanja */}
-          <div className="grid grid-cols-4 gap-px overflow-hidden rounded-sm border border-neutral-300 bg-neutral-300">
-            {(["year", "month", "day", "hour"] as const).map((k) => {
-              const p = demo.pillars[k];
-              const lbl = pillarLabels[k];
-              return (
-                <div
-                  key={k}
-                  className="flex min-h-[14rem] flex-col items-center justify-between gap-4 bg-[--color-neutral-25] px-2 py-8 md:min-h-[18rem] md:py-12"
-                >
-                  <div className="text-[10px] uppercase tracking-[0.25em] text-neutral-400">
-                    {lbl.kr} · {lbl.han}
-                  </div>
-                  {p ? (
-                    <>
-                      <div
-                        className="text-5xl leading-none md:text-[6.5rem]"
-                        style={{ fontFamily: serifStack, letterSpacing: "-0.02em" }}
-                      >
-                        {p.stem.han}
-                        {p.branch.han}
-                      </div>
-                      <div className="font-mono text-[10px] tracking-wider text-neutral-500">
-                        {p.stem.kr}
-                        {p.branch.kr}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-4xl text-neutral-300">—</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+// ─────────────────────────────────────────────────────────────
+// Primitives
 
-          {/* Metadata table */}
-          <dl className="mt-10 grid grid-cols-1 gap-x-10 md:grid-cols-2">
-            {[
-              ["납음 (일주)", demo.napeum.day],
-              [
-                "공망 (일주 기준)",
-                `${demo.kongmang.byDay[0].han}·${demo.kongmang.byDay[1].han} (${demo.kongmang.byDay[0].kr}·${demo.kongmang.byDay[1].kr})`,
-              ],
-              ["직전 절기", demo.trace.solarTerms.previousMajor.name],
-              [
-                "태양 황경",
-                `${demo.trace.solarTerms.solarLongitudeAtBirth.toFixed(3)}°`,
-              ],
-              ["JDN (일주 기준일)", demo.trace.pillarDecisions.day.jdn.toString()],
-              [
-                "입춘 기준 연도",
-                demo.trace.pillarDecisions.year.effectiveYear.toString(),
-              ],
-            ].map(([k, v]) => (
-              <div
-                key={k}
-                className="flex items-baseline justify-between gap-4 border-b border-neutral-200 py-3"
-              >
-                <dt className="text-[11px] uppercase tracking-[0.2em] text-neutral-500">{k}</dt>
-                <dd
-                  className="font-mono text-sm tabular-nums text-neutral-900"
-                  style={{ letterSpacing: "0.02em" }}
-                >
-                  {v}
-                </dd>
-              </div>
-            ))}
-          </dl>
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500">
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
 
-          {demo.trace.warnings.length > 0 && (
-            <details className="mt-10 border-t border-neutral-200 pt-6">
-              <summary className="cursor-pointer text-[11px] uppercase tracking-[0.25em] text-neutral-500 hover:text-[--color-accent-700]">
-                v0.1 제약 ({demo.trace.warnings.length})
-              </summary>
-              <ul className="mt-4 space-y-2 text-sm text-neutral-600">
-                {demo.trace.warnings.map((w, i) => (
-                  <li key={i} className="flex gap-3">
-                    <span className="font-mono text-neutral-400">0{i + 1}</span>
-                    <span>{w}</span>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </div>
-      </section>
+function SegControl<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: ReadonlyArray<{ value: T; label: string }>;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="grid gap-0 overflow-hidden rounded-sm border border-neutral-300 bg-[--color-neutral-25]" style={{gridTemplateColumns:`repeat(${options.length}, 1fr)`}}>
+      {options.map((o, i) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={`py-2 text-sm transition-colors ${
+            value === o.value
+              ? "bg-neutral-900 text-[--color-neutral-25]"
+              : "text-neutral-600 hover:bg-neutral-100"
+          } ${i > 0 ? "border-l border-neutral-300" : ""}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
-      {/* ── Footer ─────────────────────────────────────────── */}
-      <footer className="border-t border-neutral-300 px-6 md:px-10">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 py-10 text-xs text-neutral-500 md:grid-cols-3">
-          <div className="flex items-baseline gap-2">
-            <span className="text-lg" style={{ fontFamily: serifStack }}>
-              本然
-            </span>
-            <span className="font-mono tracking-wider">BONYEON</span>
-          </div>
-          <div className="md:text-center">© 2026 · 1인 풀스택</div>
-          <div className="font-mono md:text-right">
-            <a
-              className="hover:text-[--color-accent-700]"
-              href="https://github.com/exsucut/BONYEON"
-            >
-              github.com/exsucut/BONYEON
-            </a>
-          </div>
-        </div>
-      </footer>
+function NumInput({
+  value,
+  onChange,
+  min,
+  max,
+  suffix,
+  disabled,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  suffix: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="relative">
+      <input
+        type="number"
+        value={value}
+        min={min}
+        max={max}
+        disabled={disabled}
+        onChange={(e) => {
+          const n = Number(e.target.value);
+          if (!Number.isNaN(n)) onChange(n);
+        }}
+        className="w-full rounded-sm border border-neutral-300 bg-[--color-neutral-25] px-3 py-2 pr-7 font-mono text-sm tabular-nums outline-none transition-colors focus:border-[--color-accent-500] disabled:cursor-not-allowed"
+      />
+      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-neutral-400">
+        {suffix}
+      </span>
+    </div>
+  );
+}
+
+function Card({
+  label,
+  value,
+  sub,
+  serif,
+  mono,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  serif?: boolean;
+  mono?: boolean;
+}) {
+  return (
+    <div className="rounded-sm border border-neutral-200 bg-[--color-neutral-25] p-4">
+      <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500">
+        {label}
+      </div>
+      <div
+        className={`text-2xl tracking-tight ${mono ? "font-mono tabular-nums" : ""}`}
+        style={serif ? { fontFamily: SERIF } : undefined}
+      >
+        {value}
+      </div>
+      {sub && <div className="mt-1 text-xs text-neutral-500">{sub}</div>}
     </div>
   );
 }
