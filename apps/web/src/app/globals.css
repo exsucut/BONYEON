@@ -7,18 +7,36 @@
   --color-neutral-100: #ede8dc;
   --color-neutral-200: #d9d4c6;
   --color-neutral-300: #b5b0a3;
+  --color-neutral-400: #8a8578;
   --color-neutral-500: #6b675d;
+  --color-neutral-600: #50463a;
   --color-neutral-700: #3a3730;
+  --color-neutral-800: #2a2720;
   --color-neutral-900: #1a1814;
 
+  --color-accent-100: #f6e0d6;
+  --color-accent-200: #eec2b0;
   --color-accent-300: #e6a994;
   --color-accent-500: #c4563c;
+  --color-accent-600: #ad4a33;
   --color-accent-700: #9a3e2a;
   --color-accent-900: #6e2a1c;
 
-  --font-display: "Iowan Old Style", "Times New Roman", "Noto Serif KR", Georgia, serif;
-  --font-sans: "Pretendard Variable", "Pretendard", system-ui, -apple-system, "Segoe UI",
+  /* Ohaeng (오행) — desaturated per docs/70 */
+  --color-oh-wood: #5b7760;
+  --color-oh-fire: #a64a3e;
+  --color-oh-earth: #a88b5b;
+  --color-oh-metal: #b5b2a8;
+  --color-oh-water: #2e3b4e;
+
+  --font-display:
+    "Apple SD Gothic Neo", "Noto Serif KR", "Nanum Myeongjo", "Yu Mincho",
+    "Songti SC", serif;
+  --font-sans:
+    "Pretendard Variable", "Pretendard", system-ui, -apple-system, "Segoe UI",
     "Noto Sans KR", sans-serif;
+  --font-mono:
+    "JetBrains Mono", "SF Mono", "IBM Plex Mono", ui-monospace, monospace;
 }
 
 html,
@@ -28,9 +46,74 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01", "ss02", "cv01", "cv02";
 }
 
 ::selection {
   background: var(--color-accent-500);
   color: var(--color-neutral-25);
+}
+
+/* Subtle hanji-like texture on body via tiny noise (CSS only) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+  background-image: radial-gradient(
+      circle at 20% 10%,
+      rgba(139, 110, 84, 0.05),
+      transparent 40%
+    ),
+    radial-gradient(circle at 80% 90%, rgba(58, 55, 48, 0.04), transparent 45%);
+}
+
+/* Remove arrows from number inputs */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Custom scrollbars */
+@supports (scrollbar-width: thin) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-neutral-300) transparent;
+  }
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-neutral-300);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-neutral-400);
+}
+
+/* Subtle entrance for the hero pillar */
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise-in {
+  animation: riseIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }

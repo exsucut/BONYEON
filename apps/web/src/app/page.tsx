@@ -1,11 +1,17 @@
 "use client";
 
 import {
-  compute,
+  compute as computeSaju,
   type JasiConvention,
   type ManseryeokOutput,
 } from "@bonyeon/engine-manseryeok";
+import {
+  compute as computeG48,
+  type GoldschneiderOutput,
+} from "@bonyeon/engine-goldschneider";
 import { useMemo, useState } from "react";
+
+// ─────────────────────────────────────────────────────────────
 
 type FormState = {
   year: number;
@@ -19,18 +25,21 @@ type FormState = {
   jasi: JasiConvention;
 };
 
-type TabKey = "saju" | "ziwei" | "g48" | "axis" | "ennea" | "cross";
+type TabKey = "saju" | "g48" | "ziwei" | "axis" | "ennea" | "cross";
 
 const TABS: ReadonlyArray<{ key: TabKey; kr: string; han: string; built: boolean }> = [
   { key: "saju", kr: "사주", han: "四柱", built: true },
+  { key: "g48", kr: "48주 원형", han: "週", built: true },
   { key: "ziwei", kr: "자미두수", han: "紫微", built: false },
-  { key: "g48", kr: "48주", han: "週", built: false },
   { key: "axis", kr: "4축 성향", han: "軸", built: false },
   { key: "ennea", kr: "내면 동기", han: "九", built: false },
   { key: "cross", kr: "교차 인사이트", han: "×", built: false },
 ];
 
-const SERIF = `"Apple SD Gothic Neo", "Noto Serif KR", "Nanum Myeongjo", "Yu Mincho", serif`;
+const SERIF = `var(--font-display)`;
+const MONO = `var(--font-mono)`;
+
+// ─────────────────────────────────────────────────────────────
 
 export default function App() {
   const [form, setForm] = useState<FormState>({
@@ -48,70 +57,52 @@ export default function App() {
   const [tab, setTab] = useState<TabKey>("saju");
   const [traceOpen, setTraceOpen] = useState(false);
 
-  const result: ManseryeokOutput | null = useMemo(() => {
+  const saju: ManseryeokOutput | null = useMemo(() => {
     try {
-      return compute({
+      return computeSaju({
         date: { year: form.year, month: form.month, day: form.day },
         time: form.timeUnknown ? null : { hour: form.hour, minute: form.minute },
         calendarType: form.calendarType,
         location: { longitude: 126.978, latitude: 37.5665, cityName: "서울" },
-        conventions: { jasi: form.jasi, yearBoundary: "ipchun", useTrueSolarTime: false },
+        conventions: {
+          jasi: form.jasi,
+          yearBoundary: "ipchun",
+          useTrueSolarTime: false,
+        },
       });
     } catch {
       return null;
     }
   }, [form]);
 
-  const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+  const g48: GoldschneiderOutput | null = useMemo(() => {
+    try {
+      return computeG48({
+        solarDate: { year: form.year, month: form.month, day: form.day },
+      });
+    } catch {
+      return null;
+    }
+  }, [form]);
+
+  const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
   return (
-    <div className="flex h-screen flex-col bg-[--color-neutral-50] antialiased">
-      {/* ── Top bar ───────────────────────────────── */}
-      <header className="flex h-14 flex-none items-center justify-between border-b border-neutral-200 bg-[--color-neutral-25] px-4 md:px-6">
-        <div className="flex items-baseline gap-2">
-          <span
-            className="text-lg font-medium leading-none"
-            style={{ fontFamily: SERIF }}
-          >
-            本然
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500">
-            BONYEON
-          </span>
-          <span className="ml-3 hidden rounded-full bg-[--color-accent-500]/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-[--color-accent-700] sm:inline-block">
-            v0.1.0
-          </span>
-        </div>
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            className="text-xs text-neutral-600 hover:text-neutral-900"
-          >
-            저장된 프로필
-          </button>
-          <a
-            href="https://github.com/exsucut/BONYEON"
-            className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500 hover:text-[--color-accent-700]"
-          >
-            Source ↗
-          </a>
-        </div>
-      </header>
+    <div className="relative z-10 flex h-screen flex-col">
+      <TopBar />
 
-      {/* ── Main grid ─────────────────────────────── */}
-      <div className="grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-[320px_1fr]">
-        {/* Sidebar: input */}
-        <aside className="overflow-y-auto border-b border-neutral-200 bg-[--color-neutral-25] px-5 py-6 md:border-b-0 md:border-r">
-          <InputPanel form={form} onChange={updateForm} />
+      <div className="grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-[340px_1fr]">
+        <aside className="overflow-y-auto border-b border-neutral-200 bg-[--color-neutral-25]/70 backdrop-blur-sm md:border-b-0 md:border-r">
+          <InputPanel form={form} onChange={update} />
         </aside>
 
-        {/* Main: report */}
         <main className="overflow-y-auto">
-          {result ? (
+          {saju ? (
             <ReportView
-              result={result}
+              saju={saju}
+              g48={g48}
               tab={tab}
               onTabChange={setTab}
               traceOpen={traceOpen}
@@ -119,7 +110,7 @@ export default function App() {
               profileSummary={profileSummary(form)}
             />
           ) : (
-            <div className="flex h-full items-center justify-center p-8 text-sm text-neutral-500">
+            <div className="flex h-full items-center justify-center text-sm text-neutral-500">
               입력을 확인해주세요.
             </div>
           )}
@@ -131,14 +122,98 @@ export default function App() {
 
 // ─────────────────────────────────────────────────────────────
 
+function TopBar() {
+  return (
+    <header className="relative z-20 flex h-14 flex-none items-center justify-between border-b border-neutral-200/80 bg-[--color-neutral-25]/90 px-4 backdrop-blur md:px-6">
+      <div className="flex items-center gap-3">
+        <SealMark />
+        <div className="flex items-baseline gap-2">
+          <span
+            className="text-xl font-medium leading-none tracking-tight"
+            style={{ fontFamily: SERIF }}
+          >
+            本然
+          </span>
+          <span
+            className="text-[10px] uppercase tracking-[0.25em] text-neutral-500"
+            style={{ fontFamily: MONO }}
+          >
+            BONYEON
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="rounded-full border border-neutral-200 px-3 py-1 text-xs text-neutral-600 transition hover:border-neutral-400 hover:text-neutral-900"
+        >
+          저장된 프로필
+        </button>
+        <a
+          href="https://github.com/exsucut/BONYEON"
+          className="rounded-full bg-neutral-900 px-3 py-1 text-xs text-[--color-neutral-25] transition hover:bg-[--color-accent-700]"
+        >
+          Source ↗
+        </a>
+      </div>
+    </header>
+  );
+}
+
+function SealMark() {
+  return (
+    <svg
+      width="28"
+      height="28"
+      viewBox="0 0 40 40"
+      aria-hidden
+      className="text-[--color-accent-500]"
+    >
+      <rect
+        x="1.5"
+        y="1.5"
+        width="37"
+        height="37"
+        rx="3"
+        fill="currentColor"
+        opacity="0.1"
+      />
+      <rect
+        x="1.5"
+        y="1.5"
+        width="37"
+        height="37"
+        rx="3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <text
+        x="20"
+        y="27"
+        textAnchor="middle"
+        fontSize="20"
+        fill="currentColor"
+        style={{ fontFamily: SERIF, fontWeight: 500 }}
+      >
+        本
+      </text>
+    </svg>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+
 function profileSummary(f: FormState): string {
   const genderKr = f.gender === "male" ? "남자" : "여자";
   const calKr = f.calendarType === "solar" ? "양력" : "음력";
-  const date = `${f.year}.${String(f.month).padStart(2, "0")}.${String(f.day).padStart(2, "0")}`;
-  const time = f.timeUnknown
-    ? "시간 모름"
-    : `${String(f.hour).padStart(2, "0")}:${String(f.minute).padStart(2, "0")}`;
+  const date = `${f.year}.${pad2(f.month)}.${pad2(f.day)}`;
+  const time = f.timeUnknown ? "시간 모름" : `${pad2(f.hour)}:${pad2(f.minute)}`;
   return `${calKr} · ${date} · ${time} · ${genderKr}`;
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -151,17 +226,22 @@ function InputPanel({
   onChange: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
 }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-7 px-6 py-7">
       <div>
-        <h2 className="mb-1 font-mono text-[10px] uppercase tracking-[0.25em] text-neutral-500">
-          § Input
-        </h2>
-        <p className="text-xs text-neutral-500">
-          변경 시 즉시 재계산됩니다.
+        <div className="mb-1.5 flex items-baseline gap-2">
+          <span
+            className="text-[10px] uppercase tracking-[0.25em] text-[--color-accent-700]"
+            style={{ fontFamily: MONO }}
+          >
+            § Input
+          </span>
+          <div className="h-px flex-1 bg-neutral-200" />
+        </div>
+        <p className="text-xs leading-relaxed text-neutral-500">
+          값을 변경하면 리포트가 즉시 재계산됩니다.
         </p>
       </div>
 
-      {/* Calendar type + gender */}
       <Field label="달력">
         <SegControl
           value={form.calendarType}
@@ -184,11 +264,8 @@ function InputPanel({
         />
       </Field>
 
-      {/* Date */}
       <div>
-        <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500">
-          생년월일
-        </label>
+        <FieldLabel>생년월일</FieldLabel>
         <div className="grid grid-cols-[1.4fr_1fr_1fr] gap-2">
           <NumInput
             value={form.year}
@@ -199,14 +276,14 @@ function InputPanel({
           />
           <NumInput
             value={form.month}
-            onChange={(v) => onChange("month", Math.min(12, Math.max(1, v)))}
+            onChange={(v) => onChange("month", clamp(v, 1, 12))}
             min={1}
             max={12}
             suffix="월"
           />
           <NumInput
             value={form.day}
-            onChange={(v) => onChange("day", Math.min(31, Math.max(1, v)))}
+            onChange={(v) => onChange("day", clamp(v, 1, 31))}
             min={1}
             max={31}
             suffix="일"
@@ -214,12 +291,9 @@ function InputPanel({
         </div>
       </div>
 
-      {/* Time */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <label className="block font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500">
-            출생 시간
-          </label>
+          <FieldLabel>출생 시간</FieldLabel>
           <label className="flex items-center gap-1.5 text-[11px] text-neutral-500">
             <input
               type="checkbox"
@@ -230,12 +304,10 @@ function InputPanel({
             모름
           </label>
         </div>
-        <div
-          className={`grid grid-cols-2 gap-2 ${form.timeUnknown ? "opacity-40" : ""}`}
-        >
+        <div className={`grid grid-cols-2 gap-2 transition ${form.timeUnknown ? "opacity-40" : ""}`}>
           <NumInput
             value={form.hour}
-            onChange={(v) => onChange("hour", Math.min(23, Math.max(0, v)))}
+            onChange={(v) => onChange("hour", clamp(v, 0, 23))}
             min={0}
             max={23}
             suffix="시"
@@ -243,7 +315,7 @@ function InputPanel({
           />
           <NumInput
             value={form.minute}
-            onChange={(v) => onChange("minute", Math.min(59, Math.max(0, v)))}
+            onChange={(v) => onChange("minute", clamp(v, 0, 59))}
             min={0}
             max={59}
             suffix="분"
@@ -252,12 +324,11 @@ function InputPanel({
         </div>
       </div>
 
-      {/* Jasi convention */}
       <Field label="자시 관례">
         <select
           value={form.jasi}
           onChange={(e) => onChange("jasi", e.target.value as JasiConvention)}
-          className="w-full rounded-sm border border-neutral-300 bg-[--color-neutral-25] px-3 py-2 text-sm outline-none transition-colors focus:border-[--color-accent-500]"
+          className="w-full rounded-md border border-neutral-300 bg-[--color-neutral-25] px-3 py-2 text-sm outline-none transition focus:border-[--color-accent-500] focus:ring-4 focus:ring-[--color-accent-500]/10"
         >
           <option value="unified">통일 자시 (23:00 기준)</option>
           <option value="split">야자시·조자시 분리</option>
@@ -265,32 +336,40 @@ function InputPanel({
         </select>
       </Field>
 
-      {/* Meta */}
-      <div className="border-t border-neutral-200 pt-4 text-[11px] text-neutral-500">
-        <div className="mb-1">
-          출생지: <span className="font-mono">서울</span>{" "}
-          <span className="text-neutral-400">(고정, v0.2에서 선택)</span>
+      <div className="rounded-md border border-neutral-200 bg-[--color-neutral-50]/50 p-3 text-[11px] leading-relaxed text-neutral-500">
+        <div className="mb-0.5">
+          <span className="text-neutral-400">출생지</span>{" "}
+          <span style={{ fontFamily: MONO }}>서울 37.57°N 126.98°E</span>
         </div>
-        <div>
-          <span className="font-mono">KST +09:00</span>{" "}
-          <span className="text-neutral-400">· 표준시 · 진태양시 보정 없음</span>
+        <div className="mb-0.5">
+          <span className="text-neutral-400">시간대</span>{" "}
+          <span style={{ fontFamily: MONO }}>KST +09:00 표준시</span>
+        </div>
+        <div className="text-neutral-400">
+          진태양시 보정·서머타임은 v0.2에서 적용됩니다.
         </div>
       </div>
     </div>
   );
 }
 
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
 // ─────────────────────────────────────────────────────────────
 
 function ReportView({
-  result,
+  saju,
+  g48,
   tab,
   onTabChange,
   traceOpen,
   onTraceToggle,
   profileSummary,
 }: {
-  result: ManseryeokOutput;
+  saju: ManseryeokOutput;
+  g48: GoldschneiderOutput | null;
   tab: TabKey;
   onTabChange: (t: TabKey) => void;
   traceOpen: boolean;
@@ -299,85 +378,36 @@ function ReportView({
 }) {
   return (
     <div className="flex h-full flex-col">
-      {/* Hero summary */}
-      <section className="border-b border-neutral-200 bg-[--color-neutral-25] px-6 py-6 md:px-10 md:py-8">
-        <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.25em] text-neutral-500">
-          프로필
-        </div>
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-          <h1
-            className="text-3xl tracking-tight md:text-4xl"
-            style={{ fontFamily: SERIF }}
-          >
-            {(["year", "month", "day", "hour"] as const)
-              .map((k) => {
-                const p = result.pillars[k];
-                return p ? `${p.stem.han}${p.branch.han}` : "—";
-              })
-              .join(" ")}
-          </h1>
-          <span className="font-mono text-xs text-neutral-500">{profileSummary}</span>
-        </div>
-      </section>
+      <HeroSummary saju={saju} profileSummary={profileSummary} />
 
-      {/* Tabs */}
-      <nav className="flex-none overflow-x-auto border-b border-neutral-200 bg-[--color-neutral-25] px-4 md:px-10">
-        <div className="flex gap-0 whitespace-nowrap">
-          {TABS.map((t) => {
-            const active = tab === t.key;
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => onTabChange(t.key)}
-                className={`relative flex items-baseline gap-2 border-b-2 px-3 py-3 text-sm transition-colors ${
-                  active
-                    ? "border-[--color-accent-500] text-neutral-900"
-                    : "border-transparent text-neutral-500 hover:text-neutral-900"
-                }`}
-              >
-                <span>{t.kr}</span>
-                <span
-                  className="text-[11px] text-neutral-400"
-                  style={{ fontFamily: SERIF }}
-                >
-                  {t.han}
-                </span>
-                {!t.built && (
-                  <span className="ml-1 rounded-sm bg-neutral-200 px-1 py-0.5 font-mono text-[9px] uppercase text-neutral-500">
-                    soon
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      <TabBar tab={tab} onTabChange={onTabChange} />
 
-      {/* Content */}
       <section className="flex-1 overflow-y-auto">
-        {tab === "saju" ? (
-          <SajuPanel result={result} />
-        ) : (
-          <NotReadyPanel tab={tab} />
-        )}
+        {tab === "saju" && <SajuPanel saju={saju} />}
+        {tab === "g48" && g48 && <G48Panel g48={g48} />}
+        {tab !== "saju" && tab !== "g48" && <NotReadyPanel tab={tab} />}
 
-        {/* Trace drawer */}
-        <div className="border-t border-neutral-200">
+        <div className="border-t border-neutral-200 bg-[--color-neutral-25]">
           <button
             type="button"
             onClick={onTraceToggle}
-            className="flex w-full items-center justify-between px-6 py-3 text-left font-mono text-[11px] uppercase tracking-[0.2em] text-neutral-500 transition-colors hover:bg-neutral-100 md:px-10"
+            className="flex w-full items-center justify-between px-6 py-3 text-left text-[11px] uppercase tracking-[0.25em] text-neutral-500 transition-colors hover:bg-neutral-100 md:px-10"
+            style={{ fontFamily: MONO }}
           >
             <span>
               § Trace · 계산 근거{" "}
               <span className="ml-2 text-neutral-400">
-                ({result.trace.warnings.length} warnings)
+                ({saju.trace.warnings.length} warnings)
               </span>
             </span>
-            <span className="text-neutral-400">{traceOpen ? "▲" : "▼"}</span>
+            <span
+              className="text-neutral-400 transition-transform"
+              style={{ transform: traceOpen ? "rotate(180deg)" : "none" }}
+            >
+              ▾
+            </span>
           </button>
-          {traceOpen && <TracePanel result={result} />}
+          {traceOpen && <TracePanel saju={saju} />}
         </div>
       </section>
     </div>
@@ -386,7 +416,109 @@ function ReportView({
 
 // ─────────────────────────────────────────────────────────────
 
-function SajuPanel({ result }: { result: ManseryeokOutput }) {
+function HeroSummary({
+  saju,
+  profileSummary,
+}: {
+  saju: ManseryeokOutput;
+  profileSummary: string;
+}) {
+  return (
+    <section className="relative overflow-hidden border-b border-neutral-200 bg-gradient-to-br from-[--color-neutral-25] to-[--color-neutral-50] px-6 py-7 md:px-10 md:py-8">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-10 -top-16 select-none text-[18rem] leading-none text-[--color-neutral-100]"
+        style={{ fontFamily: SERIF, fontWeight: 300 }}
+      >
+        本
+      </div>
+
+      <div className="relative">
+        <div
+          className="mb-1 flex items-center gap-3 text-[10px] uppercase tracking-[0.25em] text-neutral-500"
+          style={{ fontFamily: MONO }}
+        >
+          <span className="text-[--color-accent-700]">PROFILE</span>
+          <div className="h-px flex-1 max-w-[6rem] bg-neutral-200" />
+        </div>
+
+        <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
+          <h1
+            className="rise-in text-3xl leading-none tracking-tight md:text-5xl"
+            style={{ fontFamily: SERIF, letterSpacing: "-0.02em" }}
+          >
+            {(["year", "month", "day", "hour"] as const)
+              .map((k) => {
+                const p = saju.pillars[k];
+                return p ? `${p.stem.han}${p.branch.han}` : "—";
+              })
+              .join(" · ")}
+          </h1>
+          <span
+            className="text-xs text-neutral-500"
+            style={{ fontFamily: MONO }}
+          >
+            {profileSummary}
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+
+function TabBar({
+  tab,
+  onTabChange,
+}: {
+  tab: TabKey;
+  onTabChange: (t: TabKey) => void;
+}) {
+  return (
+    <nav className="flex-none overflow-x-auto border-b border-neutral-200 bg-[--color-neutral-25]">
+      <div className="flex gap-0 whitespace-nowrap px-4 md:px-10">
+        {TABS.map((t) => {
+          const active = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => onTabChange(t.key)}
+              className={`group relative flex items-baseline gap-2 px-4 py-3.5 text-sm transition-colors ${
+                active ? "text-neutral-900" : "text-neutral-500 hover:text-neutral-800"
+              }`}
+            >
+              <span>{t.kr}</span>
+              <span
+                className="text-[11px] text-neutral-400"
+                style={{ fontFamily: SERIF }}
+              >
+                {t.han}
+              </span>
+              {!t.built && (
+                <span
+                  className="ml-1 rounded-full bg-neutral-200 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-neutral-500"
+                  style={{ fontFamily: MONO }}
+                >
+                  soon
+                </span>
+              )}
+              {active && (
+                <span className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full bg-[--color-accent-500]" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Saju panel
+
+function SajuPanel({ saju }: { saju: ManseryeokOutput }) {
   const pillarLabels = {
     year: { kr: "연주", han: "年" },
     month: { kr: "월주", han: "月" },
@@ -396,152 +528,491 @@ function SajuPanel({ result }: { result: ManseryeokOutput }) {
 
   return (
     <div className="px-6 py-8 md:px-10 md:py-10">
-      {/* Four pillars grid */}
-      <div className="mb-10 grid grid-cols-4 gap-px overflow-hidden rounded-sm border border-neutral-300 bg-neutral-300">
+      {/* Four pillars */}
+      <div className="mb-10 grid grid-cols-2 gap-3 md:grid-cols-4">
         {(["year", "month", "day", "hour"] as const).map((k) => {
-          const p = result.pillars[k];
+          const p = saju.pillars[k];
           const lbl = pillarLabels[k];
-          const stems = result.hiddenStems[k];
+          const stems = saju.hiddenStems[k];
+          const isEmpty = !p;
           return (
             <div
               key={k}
-              className="flex min-h-[12rem] flex-col justify-between gap-3 bg-[--color-neutral-25] p-3 md:min-h-[16rem] md:p-5"
+              className="group relative overflow-hidden rounded-xl border border-neutral-200 bg-[--color-neutral-25] p-5 shadow-[0_1px_0_rgba(58,55,48,0.03)] transition hover:-translate-y-0.5 hover:border-[--color-accent-300] hover:shadow-[0_6px_20px_-8px_rgba(58,55,48,0.15)]"
+              style={{
+                backgroundImage:
+                  "linear-gradient(180deg, rgba(196,86,60,0.02) 0%, transparent 40%)",
+              }}
             >
-              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-400">
-                {lbl.kr} · {lbl.han}
-              </div>
-              {p ? (
-                <div className="flex flex-col items-center">
-                  <div
-                    className="text-4xl leading-none md:text-6xl"
-                    style={{ fontFamily: SERIF, letterSpacing: "-0.02em" }}
-                  >
-                    {p.stem.han}
-                    {p.branch.han}
-                  </div>
-                  <div className="mt-2 font-mono text-[10px] tracking-wider text-neutral-500">
-                    {p.stem.kr}
-                    {p.branch.kr}
-                  </div>
+              <div className="mb-4 flex items-baseline justify-between">
+                <div
+                  className="text-[10px] uppercase tracking-[0.25em] text-neutral-500"
+                  style={{ fontFamily: MONO }}
+                >
+                  {lbl.kr}
                 </div>
-              ) : (
-                <div className="flex items-center justify-center text-3xl text-neutral-300">
+                <div
+                  className="text-xl text-[--color-accent-500]/40"
+                  style={{ fontFamily: SERIF }}
+                >
+                  {lbl.han}
+                </div>
+              </div>
+
+              {isEmpty ? (
+                <div className="flex h-28 items-center justify-center text-3xl text-neutral-200">
                   —
                 </div>
-              )}
-              {/* 지장간 miniature */}
-              <div className="flex flex-wrap items-center justify-center gap-1">
-                {stems?.map((hs, i) => (
-                  <span
-                    key={i}
-                    className="rounded-sm bg-neutral-100 px-1.5 py-0.5 font-mono text-[10px] text-neutral-600"
-                    title={`${hs.type} · ${hs.days}일`}
+              ) : (
+                <>
+                  <div className="mb-1 flex items-end justify-center gap-0">
+                    <div
+                      className="text-6xl leading-[0.9]"
+                      style={{
+                        fontFamily: SERIF,
+                        letterSpacing: "-0.03em",
+                        color: elementColor(p.stem.element),
+                      }}
+                    >
+                      {p.stem.han}
+                    </div>
+                    <div
+                      className="text-6xl leading-[0.9]"
+                      style={{
+                        fontFamily: SERIF,
+                        letterSpacing: "-0.03em",
+                        color: elementColor(p.branch.element),
+                      }}
+                    >
+                      {p.branch.han}
+                    </div>
+                  </div>
+                  <div
+                    className="mb-4 text-center text-[11px] tracking-wider text-neutral-500"
+                    style={{ fontFamily: MONO }}
                   >
-                    {hs.stem.han}
-                  </span>
-                ))}
-              </div>
+                    {p.stem.kr}
+                    {p.branch.kr} ·{" "}
+                    <span style={{ color: elementColor(p.stem.element) }}>
+                      {p.stem.element}
+                    </span>
+                    <span className="text-neutral-400"> / </span>
+                    <span style={{ color: elementColor(p.branch.element) }}>
+                      {p.branch.element}
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {stems && stems.length > 0 && (
+                <div className="flex flex-wrap items-center justify-center gap-1 border-t border-neutral-100 pt-3">
+                  {stems.map((hs, i) => (
+                    <div
+                      key={i}
+                      className="flex items-baseline gap-0.5 rounded-full bg-neutral-100 px-2 py-0.5"
+                      title={`${labelHiddenType(hs.type)} · ${String(hs.days)}일`}
+                    >
+                      <span
+                        className="text-[13px]"
+                        style={{
+                          fontFamily: SERIF,
+                          color: elementColor(hs.stem.element),
+                        }}
+                      >
+                        {hs.stem.han}
+                      </span>
+                      <span
+                        className="text-[9px] text-neutral-400"
+                        style={{ fontFamily: MONO }}
+                      >
+                        {hs.days}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* Cards */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-        <Card label="납음 (일주)" value={result.napeum.day} serif />
-        <Card
-          label="공망 (일주 기준)"
-          value={`${result.kongmang.byDay[0].han}·${result.kongmang.byDay[1].han}`}
-          sub={`${result.kongmang.byDay[0].kr}·${result.kongmang.byDay[1].kr}`}
-          serif
-        />
-        <Card
-          label="직전 절기"
-          value={result.trace.solarTerms.previousMajor.name}
-          sub={new Date(result.trace.solarTerms.previousMajor.utc)
-            .toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" })
-            .replace(" 오전", "")
-            .replace(" 오후", "")}
-        />
-        <Card
-          label="다음 절기"
-          value={result.trace.solarTerms.nextMajor.name}
-          sub={new Date(result.trace.solarTerms.nextMajor.utc)
-            .toLocaleString("ko-KR", { dateStyle: "medium" })}
-        />
-        <Card
-          label="태양 황경"
-          value={`${result.trace.solarTerms.solarLongitudeAtBirth.toFixed(3)}°`}
-          mono
-        />
-        <Card
-          label="JDN (일주 기준일)"
-          value={result.trace.pillarDecisions.day.jdn.toString()}
-          sub={`${result.trace.pillarDecisions.day.referenceAnchor.pillar} 기준`}
-          mono
-        />
-      </div>
+      {/* Ohaeng + metadata */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.2fr_1fr]">
+        <section className="rounded-xl border border-neutral-200 bg-[--color-neutral-25] p-5 shadow-sm">
+          <SectionLabel text="§ 오행 분포" sub="4기둥 × 간·지 총 8자 기준" />
+          <OhaengDonut saju={saju} />
+        </section>
 
-      {/* 오행 요약 */}
-      <div className="mt-8 rounded-sm border border-neutral-200 bg-[--color-neutral-25] p-5">
-        <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.25em] text-neutral-500">
-          § 오행 분포 (4기둥 간·지)
-        </div>
-        <OhaengBar result={result} />
+        <section className="rounded-xl border border-neutral-200 bg-[--color-neutral-25] p-5 shadow-sm">
+          <SectionLabel text="§ 메타데이터" sub="만세력 엔진 부가 출력" />
+          <dl className="space-y-3 text-sm">
+            <MetaRow
+              label="납음 (일주)"
+              value={saju.napeum.day}
+              serif
+            />
+            <MetaRow
+              label="공망"
+              value={`${saju.kongmang.byDay[0].han}·${saju.kongmang.byDay[1].han}`}
+              sub={`${saju.kongmang.byDay[0].kr}·${saju.kongmang.byDay[1].kr}`}
+              serif
+            />
+            <MetaRow
+              label="직전 절기"
+              value={saju.trace.solarTerms.previousMajor.name}
+              sub={formatDate(saju.trace.solarTerms.previousMajor.utc)}
+            />
+            <MetaRow
+              label="다음 절기"
+              value={saju.trace.solarTerms.nextMajor.name}
+              sub={formatDate(saju.trace.solarTerms.nextMajor.utc)}
+            />
+            <MetaRow
+              label="태양 황경"
+              value={`${saju.trace.solarTerms.solarLongitudeAtBirth.toFixed(3)}°`}
+              mono
+            />
+            <MetaRow
+              label="JDN (일주 기준일)"
+              value={saju.trace.pillarDecisions.day.jdn.toString()}
+              sub={`anchor ${saju.trace.pillarDecisions.day.referenceAnchor.pillar}`}
+              mono
+            />
+          </dl>
+        </section>
       </div>
     </div>
   );
 }
 
-function OhaengBar({ result }: { result: ManseryeokOutput }) {
+function elementColor(e: string): string {
+  switch (e) {
+    case "목":
+      return "var(--color-oh-wood)";
+    case "화":
+      return "var(--color-oh-fire)";
+    case "토":
+      return "var(--color-oh-earth)";
+    case "금":
+      return "var(--color-neutral-700)"; // tweak for contrast vs oatmeal
+    case "수":
+      return "var(--color-oh-water)";
+    default:
+      return "currentColor";
+  }
+}
+
+function labelHiddenType(t: string): string {
+  return t === "early" ? "초기" : t === "middle" ? "중기" : "정기";
+}
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("ko-KR", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+
+function OhaengDonut({ saju }: { saju: ManseryeokOutput }) {
+  const els = ["목", "화", "토", "금", "수"] as const;
   const tally: Record<string, number> = { 목: 0, 화: 0, 토: 0, 금: 0, 수: 0 };
   for (const key of ["year", "month", "day", "hour"] as const) {
-    const p = result.pillars[key];
+    const p = saju.pillars[key];
     if (!p) continue;
     tally[p.stem.element] = (tally[p.stem.element] ?? 0) + 1;
     tally[p.branch.element] = (tally[p.branch.element] ?? 0) + 1;
   }
-  const total = Object.values(tally).reduce((a, b) => a + b, 0);
-  const colors: Record<string, string> = {
-    목: "#5B7760",
-    화: "#A64A3E",
-    토: "#A88B5B",
-    금: "#B5B2A8",
-    수: "#2E3B4E",
+  const total = Object.values(tally).reduce((a, b) => a + b, 0) || 1;
+
+  // Build SVG donut
+  const radius = 56;
+  const stroke = 16;
+  const circ = 2 * Math.PI * radius;
+  let offset = 0;
+  const segments = els.map((el) => {
+    const portion = (tally[el] ?? 0) / total;
+    const length = portion * circ;
+    const seg = {
+      el,
+      color: elementColor(el),
+      length,
+      offset,
+      portion,
+    };
+    offset += length;
+    return seg;
+  });
+
+  return (
+    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+      <svg width="160" height="160" viewBox="0 0 160 160" className="flex-none">
+        <circle
+          cx="80"
+          cy="80"
+          r={radius}
+          fill="none"
+          stroke="var(--color-neutral-100)"
+          strokeWidth={stroke}
+        />
+        {segments.map((s) => (
+          <circle
+            key={s.el}
+            cx="80"
+            cy="80"
+            r={radius}
+            fill="none"
+            stroke={s.color}
+            strokeWidth={stroke}
+            strokeDasharray={`${s.length} ${circ - s.length}`}
+            strokeDashoffset={-s.offset}
+            transform="rotate(-90 80 80)"
+            strokeLinecap="butt"
+          />
+        ))}
+        <text
+          x="80"
+          y="77"
+          textAnchor="middle"
+          fontSize="11"
+          fill="var(--color-neutral-500)"
+          style={{ fontFamily: MONO, letterSpacing: "0.15em" }}
+        >
+          TOTAL
+        </text>
+        <text
+          x="80"
+          y="95"
+          textAnchor="middle"
+          fontSize="24"
+          fill="var(--color-neutral-900)"
+          style={{ fontFamily: SERIF, fontWeight: 500 }}
+        >
+          {total}
+        </text>
+      </svg>
+      <ul className="flex-1 space-y-1.5">
+        {els.map((el) => {
+          const n = tally[el] ?? 0;
+          const pct = Math.round((n / total) * 100);
+          return (
+            <li key={el} className="flex items-center gap-3 text-sm">
+              <span
+                className="inline-block size-3 flex-none rounded-sm"
+                style={{ backgroundColor: elementColor(el) }}
+              />
+              <span className="w-4 text-neutral-600" style={{ fontFamily: SERIF }}>
+                {el}
+              </span>
+              <span className="flex-1">
+                <span
+                  className="block h-1.5 rounded-full bg-neutral-100"
+                  style={{
+                    backgroundImage: `linear-gradient(to right, ${elementColor(el)} ${pct}%, transparent ${pct}%)`,
+                  }}
+                />
+              </span>
+              <span
+                className="w-10 text-right tabular-nums text-neutral-500"
+                style={{ fontFamily: MONO }}
+              >
+                {n}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Goldschneider panel
+
+function G48Panel({ g48 }: { g48: GoldschneiderOutput }) {
+  const signKo: Record<string, string> = {
+    aries: "양자리",
+    taurus: "황소자리",
+    gemini: "쌍둥이자리",
+    cancer: "게자리",
+    leo: "사자자리",
+    virgo: "처녀자리",
+    libra: "천칭자리",
+    scorpio: "전갈자리",
+    sagittarius: "사수자리",
+    capricorn: "염소자리",
+    aquarius: "물병자리",
+    pisces: "물고기자리",
   };
 
   return (
-    <div>
-      <div className="mb-2 flex h-3 overflow-hidden rounded-sm bg-neutral-100">
-        {(["목", "화", "토", "금", "수"] as const).map((el) => {
-          const n = tally[el] ?? 0;
-          if (n === 0) return null;
+    <div className="px-6 py-8 md:px-10 md:py-10">
+      {/* Hero card */}
+      <section
+        className="relative mb-8 overflow-hidden rounded-2xl border border-neutral-200 bg-gradient-to-br from-[--color-neutral-25] via-[--color-neutral-25] to-[--color-accent-100]/40 p-8 shadow-sm"
+      >
+        <div className="relative z-10">
+          <div
+            className="mb-2 flex items-center gap-3 text-[10px] uppercase tracking-[0.25em] text-[--color-accent-700]"
+            style={{ fontFamily: MONO }}
+          >
+            <span>ARCHETYPE · {String(g48.archetypeId).padStart(2, "0")} / 48</span>
+            <div className="h-px flex-1 max-w-[6rem] bg-neutral-200" />
+          </div>
+          <h2
+            className="mb-2 text-4xl leading-tight tracking-tight md:text-5xl"
+            style={{ fontFamily: SERIF, letterSpacing: "-0.02em" }}
+          >
+            {g48.nameKo}
+          </h2>
+          <div
+            className="mb-4 text-base text-neutral-500"
+            style={{ fontFamily: SERIF, fontStyle: "italic" }}
+          >
+            {g48.nameEn}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-neutral-600">
+            <span
+              className="rounded-full border border-neutral-200 bg-[--color-neutral-25] px-3 py-1"
+              style={{ fontFamily: MONO }}
+            >
+              {signKo[g48.sunSign]}
+            </span>
+            {g48.isCusp ? (
+              <span
+                className="rounded-full border border-[--color-accent-300] bg-[--color-accent-100]/30 px-3 py-1 text-[--color-accent-700]"
+                style={{ fontFamily: MONO }}
+              >
+                CUSP · 경계일
+              </span>
+            ) : (
+              <span
+                className="rounded-full border border-neutral-200 bg-[--color-neutral-25] px-3 py-1"
+                style={{ fontFamily: MONO }}
+              >
+                Decanate {g48.decanate}
+              </span>
+            )}
+          </div>
+          {g48.isCusp && g48.cuspDetail && (
+            <div className="mt-3 text-xs text-neutral-500">
+              {signKo[g48.cuspDetail.previousSign]} → {signKo[g48.cuspDetail.nextSign]}{" "}
+              경계. 중심에서 {Math.abs(g48.cuspDetail.daysFromCenter)}일.
+            </div>
+          )}
+        </div>
+
+        {/* Big decorative week number */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-4 -bottom-12 select-none text-[14rem] leading-none text-[--color-accent-500]/10"
+          style={{ fontFamily: SERIF, fontWeight: 300 }}
+        >
+          {String(g48.archetypeId).padStart(2, "0")}
+        </div>
+      </section>
+
+      {/* Keywords + growth */}
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <section className="rounded-xl border border-neutral-200 bg-[--color-neutral-25] p-5 shadow-sm">
+          <SectionLabel text="§ 핵심 키워드" />
+          <div className="flex flex-wrap gap-2">
+            {g48.keywords.map((k) => (
+              <span
+                key={k}
+                className="rounded-full border border-neutral-200 bg-[--color-neutral-50] px-3 py-1.5 text-sm text-neutral-700"
+              >
+                {k}
+              </span>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-neutral-200 bg-[--color-neutral-25] p-5 shadow-sm">
+          <SectionLabel text="§ 성장축" sub="당신의 원형이 움직이는 방향" />
+          <div
+            className="text-xl tracking-tight"
+            style={{ fontFamily: SERIF }}
+          >
+            {g48.growthAxis}
+          </div>
+        </section>
+      </div>
+
+      {/* Week ring */}
+      <section className="mt-5 rounded-xl border border-neutral-200 bg-[--color-neutral-25] p-5 shadow-sm">
+        <SectionLabel
+          text="§ 48주 위치"
+          sub={`전체 365일의 주기에서 당신의 위치 (${String(g48.archetypeId).padStart(2, "0")} / 48)`}
+        />
+        <WeekRing currentId={g48.archetypeId} />
+      </section>
+    </div>
+  );
+}
+
+function WeekRing({ currentId }: { currentId: number }) {
+  const size = 240;
+  const cx = size / 2;
+  const cy = size / 2;
+  const rOuter = 108;
+  const rInner = 92;
+  const slices = Array.from({ length: 48 }, (_, i) => i + 1);
+  const sweep = (2 * Math.PI) / 48;
+
+  return (
+    <div className="flex items-center justify-center py-4">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {slices.map((id) => {
+          const a0 = -Math.PI / 2 + (id - 1) * sweep;
+          const a1 = a0 + sweep * 0.9; // small gap
+          const x0o = cx + rOuter * Math.cos(a0);
+          const y0o = cy + rOuter * Math.sin(a0);
+          const x1o = cx + rOuter * Math.cos(a1);
+          const y1o = cy + rOuter * Math.sin(a1);
+          const x0i = cx + rInner * Math.cos(a0);
+          const y0i = cy + rInner * Math.sin(a0);
+          const x1i = cx + rInner * Math.cos(a1);
+          const y1i = cy + rInner * Math.sin(a1);
+          const active = id === currentId;
+          const path = `M ${x0o} ${y0o} A ${rOuter} ${rOuter} 0 0 1 ${x1o} ${y1o} L ${x1i} ${y1i} A ${rInner} ${rInner} 0 0 0 ${x0i} ${y0i} Z`;
           return (
-            <div
-              key={el}
-              style={{
-                width: `${(n / total) * 100}%`,
-                backgroundColor: colors[el],
-              }}
-              title={`${el} ${n}`}
+            <path
+              key={id}
+              d={path}
+              fill={active ? "var(--color-accent-500)" : "var(--color-neutral-200)"}
+              opacity={active ? 1 : 0.8}
             />
           );
         })}
-      </div>
-      <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs">
-        {(["목", "화", "토", "금", "수"] as const).map((el) => (
-          <div key={el} className="flex items-center gap-1.5">
-            <span
-              className="inline-block size-2 rounded-full"
-              style={{ backgroundColor: colors[el] }}
-            />
-            <span className="text-neutral-500">{el}</span>
-            <span className="font-mono tabular-nums text-neutral-900">
-              {tally[el]}
-            </span>
-          </div>
-        ))}
-      </div>
+        {/* Center text */}
+        <text
+          x={cx}
+          y={cy - 4}
+          textAnchor="middle"
+          fontSize="11"
+          fill="var(--color-neutral-500)"
+          style={{ fontFamily: MONO, letterSpacing: "0.2em" }}
+        >
+          WEEK
+        </text>
+        <text
+          x={cx}
+          y={cy + 22}
+          textAnchor="middle"
+          fontSize="36"
+          fill="var(--color-neutral-900)"
+          style={{ fontFamily: SERIF, fontWeight: 500 }}
+        >
+          {String(currentId).padStart(2, "0")}
+        </text>
+      </svg>
     </div>
   );
 }
@@ -551,23 +1022,32 @@ function OhaengBar({ result }: { result: ManseryeokOutput }) {
 function NotReadyPanel({ tab }: { tab: TabKey }) {
   const info = TABS.find((t) => t.key === tab);
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-8 py-20 text-center">
-      <div
-        className="text-7xl leading-none text-neutral-200"
-        style={{ fontFamily: SERIF }}
-      >
-        {info?.han}
+    <div className="flex h-full flex-col items-center justify-center gap-5 px-8 py-24 text-center">
+      <div className="relative">
+        <div
+          className="text-[10rem] leading-none text-[--color-neutral-100]"
+          style={{ fontFamily: SERIF }}
+        >
+          {info?.han}
+        </div>
+        <div
+          className="absolute inset-0 flex items-center justify-center text-[10rem] leading-none text-[--color-accent-500]/10"
+          style={{ fontFamily: SERIF }}
+        >
+          {info?.han}
+        </div>
       </div>
-      <h2 className="text-xl" style={{ fontFamily: SERIF }}>
+      <h2 className="text-2xl tracking-tight" style={{ fontFamily: SERIF }}>
         {info?.kr}
       </h2>
-      <p className="max-w-sm text-sm text-neutral-500">
-        이 엔진은 아직 구현되지 않았습니다. 명세는 완료 상태이며, 로드맵(P2)에
-        따라 순차 구현됩니다.
+      <p className="max-w-sm text-sm leading-relaxed text-neutral-500">
+        이 엔진은 아직 구현되지 않았습니다. 명세는 완료 상태이며,
+        로드맵(P2)에 따라 순차 구현됩니다.
       </p>
       <a
-        href="https://github.com/exsucut/BONYEON/tree/main/docs"
-        className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.2em] text-[--color-accent-700] hover:text-[--color-accent-900]"
+        href={`https://github.com/exsucut/BONYEON/tree/main/docs`}
+        className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-[--color-neutral-25] px-4 py-2 text-xs uppercase tracking-[0.2em] text-neutral-700 transition hover:border-[--color-accent-300] hover:text-[--color-accent-700]"
+        style={{ fontFamily: MONO }}
       >
         명세 보기 ↗
       </a>
@@ -577,22 +1057,22 @@ function NotReadyPanel({ tab }: { tab: TabKey }) {
 
 // ─────────────────────────────────────────────────────────────
 
-function TracePanel({ result }: { result: ManseryeokOutput }) {
-  const t = result.trace;
+function TracePanel({ saju }: { saju: ManseryeokOutput }) {
+  const t = saju.trace;
   return (
-    <div className="bg-[--color-neutral-25] px-6 py-5 font-mono text-xs md:px-10">
-      <div className="space-y-3 text-neutral-700">
+    <div className="bg-[--color-neutral-25] px-6 py-5 text-xs md:px-10" style={{ fontFamily: MONO }}>
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         <TraceRow label="입춘 UTC" value={t.pillarDecisions.year.ipchunUtc} />
         <TraceRow
           label="출생 vs 입춘"
           value={t.pillarDecisions.year.birthRelativeToIpchun}
         />
         <TraceRow
-          label="effectiveYear"
+          label="effective year"
           value={t.pillarDecisions.year.effectiveYear.toString()}
         />
         <TraceRow
-          label="월주 · 지배 절기"
+          label="지배 절기"
           value={t.pillarDecisions.month.governingTermName}
         />
         <TraceRow label="오호둔" value={t.pillarDecisions.month.wuhutunRule} />
@@ -604,20 +1084,25 @@ function TracePanel({ result }: { result: ManseryeokOutput }) {
         {t.pillarDecisions.hour && (
           <TraceRow label="오서둔" value={t.pillarDecisions.hour.wusodunRule} />
         )}
-        <TraceRow label="태양 황경" value={`${t.solarTerms.solarLongitudeAtBirth.toFixed(5)}°`} />
+        <TraceRow
+          label="태양 황경"
+          value={`${t.solarTerms.solarLongitudeAtBirth.toFixed(5)}°`}
+        />
         <TraceRow label="천문 데이터" value={t.solarTerms.dataSource} />
       </div>
 
       {t.warnings.length > 0 && (
         <div className="mt-5 border-t border-neutral-200 pt-4">
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[--color-accent-700]">
+          <div className="mb-2 text-[10px] uppercase tracking-[0.25em] text-[--color-accent-700]">
             Warnings · {t.warnings.length}
           </div>
-          <ul className="space-y-1.5 text-xs text-neutral-600">
+          <ul className="space-y-1.5 font-sans text-xs text-neutral-600">
             {t.warnings.map((w, i) => (
               <li key={i} className="flex gap-3">
-                <span className="text-neutral-400">0{i + 1}</span>
-                <span className="font-sans">{w}</span>
+                <span className="text-neutral-400" style={{ fontFamily: MONO }}>
+                  {pad2(i + 1)}
+                </span>
+                <span>{w}</span>
               </li>
             ))}
           </ul>
@@ -629,17 +1114,43 @@ function TracePanel({ result }: { result: ManseryeokOutput }) {
 
 function TraceRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[9rem_1fr] gap-4">
+    <div className="grid grid-cols-[8rem_1fr] items-baseline gap-3 border-b border-neutral-100 py-1.5">
       <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">
         {label}
       </span>
-      <span className="text-neutral-900">{value}</span>
+      <span className="break-all text-neutral-900">{value}</span>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
 // Primitives
+
+function SectionLabel({ text, sub }: { text: string; sub?: string }) {
+  return (
+    <div className="mb-4">
+      <div
+        className="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-neutral-500"
+        style={{ fontFamily: MONO }}
+      >
+        <span>{text}</span>
+        <div className="h-px flex-1 bg-neutral-200" />
+      </div>
+      {sub && <div className="mt-1 text-xs text-neutral-500">{sub}</div>}
+    </div>
+  );
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <label
+      className="mb-2 block text-[10px] uppercase tracking-[0.25em] text-neutral-500"
+      style={{ fontFamily: MONO }}
+    >
+      {children}
+    </label>
+  );
+}
 
 function Field({
   label,
@@ -650,9 +1161,7 @@ function Field({
 }) {
   return (
     <div>
-      <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500">
-        {label}
-      </div>
+      <FieldLabel>{label}</FieldLabel>
       {children}
     </div>
   );
@@ -668,21 +1177,27 @@ function SegControl<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="grid gap-0 overflow-hidden rounded-sm border border-neutral-300 bg-[--color-neutral-25]" style={{gridTemplateColumns:`repeat(${options.length}, 1fr)`}}>
-      {options.map((o, i) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          className={`py-2 text-sm transition-colors ${
-            value === o.value
-              ? "bg-neutral-900 text-[--color-neutral-25]"
-              : "text-neutral-600 hover:bg-neutral-100"
-          } ${i > 0 ? "border-l border-neutral-300" : ""}`}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div
+      className="grid gap-1 rounded-md border border-neutral-300 bg-[--color-neutral-25] p-1"
+      style={{ gridTemplateColumns: `repeat(${options.length}, 1fr)` }}
+    >
+      {options.map((o) => {
+        const active = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className={`relative rounded-[5px] py-1.5 text-sm transition-all ${
+              active
+                ? "bg-neutral-900 text-[--color-neutral-25] shadow-sm"
+                : "text-neutral-600 hover:bg-neutral-100"
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -714,16 +1229,17 @@ function NumInput({
           const n = Number(e.target.value);
           if (!Number.isNaN(n)) onChange(n);
         }}
-        className="w-full rounded-sm border border-neutral-300 bg-[--color-neutral-25] px-3 py-2 pr-7 font-mono text-sm tabular-nums outline-none transition-colors focus:border-[--color-accent-500] disabled:cursor-not-allowed"
+        className="w-full rounded-md border border-neutral-300 bg-[--color-neutral-25] px-3 py-2 pr-7 text-sm tabular-nums outline-none transition focus:border-[--color-accent-500] focus:ring-4 focus:ring-[--color-accent-500]/10 disabled:cursor-not-allowed disabled:opacity-70"
+        style={{ fontFamily: MONO }}
       />
-      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-neutral-400">
+      <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-neutral-400">
         {suffix}
       </span>
     </div>
   );
 }
 
-function Card({
+function MetaRow({
   label,
   value,
   sub,
@@ -737,17 +1253,32 @@ function Card({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-sm border border-neutral-200 bg-[--color-neutral-25] p-4">
-      <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-neutral-500">
-        {label}
-      </div>
-      <div
-        className={`text-2xl tracking-tight ${mono ? "font-mono tabular-nums" : ""}`}
-        style={serif ? { fontFamily: SERIF } : undefined}
+    <div className="flex items-baseline justify-between gap-3 border-b border-neutral-100 pb-2 last:border-b-0 last:pb-0">
+      <dt
+        className="text-[10px] uppercase tracking-[0.2em] text-neutral-500"
+        style={{ fontFamily: MONO }}
       >
-        {value}
-      </div>
-      {sub && <div className="mt-1 text-xs text-neutral-500">{sub}</div>}
+        {label}
+      </dt>
+      <dd className="text-right">
+        <div
+          className={`text-base tracking-tight ${mono ? "tabular-nums" : ""}`}
+          style={{
+            fontFamily: serif ? SERIF : mono ? MONO : "inherit",
+            letterSpacing: serif ? "-0.01em" : undefined,
+          }}
+        >
+          {value}
+        </div>
+        {sub && (
+          <div
+            className="mt-0.5 text-[11px] text-neutral-500"
+            style={{ fontFamily: MONO }}
+          >
+            {sub}
+          </div>
+        )}
+      </dd>
     </div>
   );
 }
