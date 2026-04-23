@@ -18,6 +18,16 @@ import {
   type LikertValue as MbtiLikertValue,
   type MbtiOutput,
 } from "@bonyeon/engine-mbti";
+import {
+  compute as computeEnnea,
+  INSTRUMENT_VERSION as ENNEA_INSTRUMENT_VERSION,
+  ITEMS as ENNEA_ITEMS,
+  TYPE_NAMES as ENNEA_TYPE_NAMES,
+  TRIAD_LABELS as ENNEA_TRIAD_LABELS,
+  type EnneagramOutput,
+  type EnneaType,
+  type LikertValue as EnneaLikertValue,
+} from "@bonyeon/engine-enneagram";
 import { useCallback, useMemo, useState } from "react";
 
 // ─────────────────────────────────────────────────────────────
@@ -41,7 +51,7 @@ const TABS: ReadonlyArray<{ key: TabKey; kr: string; han: string; built: boolean
   { key: "g48", kr: "48주 원형", han: "週", built: true },
   { key: "ziwei", kr: "자미두수", han: "紫微", built: false },
   { key: "axis", kr: "4축 성향", han: "軸", built: true },
-  { key: "ennea", kr: "내면 동기", han: "九", built: false },
+  { key: "ennea", kr: "내면 동기", han: "九", built: true },
   { key: "cross", kr: "교차 인사이트", han: "×", built: false },
 ];
 
@@ -81,6 +91,22 @@ export default function App() {
     setMbtiAnswers((prev) => ({ ...prev, [id]: value }));
   }, []);
   const resetMbti = useCallback(() => setMbtiAnswers({}), []);
+
+  // Enneagram survey state
+  const [enneaAnswers, setEnneaAnswers] = useState<Record<string, EnneaLikertValue>>({});
+  const ennea: EnneagramOutput | null = useMemo(() => {
+    const answered = Object.entries(enneaAnswers);
+    if (answered.length === 0) return null;
+    return computeEnnea({
+      instrumentVersion: ENNEA_INSTRUMENT_VERSION,
+      answers: answered.map(([id, value]) => ({ questionId: id, value })),
+    });
+  }, [enneaAnswers]);
+
+  const setEnneaAnswer = useCallback((id: string, value: EnneaLikertValue) => {
+    setEnneaAnswers((prev) => ({ ...prev, [id]: value }));
+  }, []);
+  const resetEnnea = useCallback(() => setEnneaAnswers({}), []);
 
   const saju: ManseryeokOutput | null = useMemo(() => {
     try {
@@ -132,6 +158,10 @@ export default function App() {
               mbtiAnswers={mbtiAnswers}
               onMbtiAnswer={setMbtiAnswer}
               onMbtiReset={resetMbti}
+              ennea={ennea}
+              enneaAnswers={enneaAnswers}
+              onEnneaAnswer={setEnneaAnswer}
+              onEnneaReset={resetEnnea}
               tab={tab}
               onTabChange={setTab}
               traceOpen={traceOpen}
@@ -395,6 +425,10 @@ function ReportView({
   mbtiAnswers,
   onMbtiAnswer,
   onMbtiReset,
+  ennea,
+  enneaAnswers,
+  onEnneaAnswer,
+  onEnneaReset,
   tab,
   onTabChange,
   traceOpen,
@@ -407,6 +441,10 @@ function ReportView({
   mbtiAnswers: Record<string, MbtiLikertValue>;
   onMbtiAnswer: (id: string, v: MbtiLikertValue) => void;
   onMbtiReset: () => void;
+  ennea: EnneagramOutput | null;
+  enneaAnswers: Record<string, EnneaLikertValue>;
+  onEnneaAnswer: (id: string, v: EnneaLikertValue) => void;
+  onEnneaReset: () => void;
   tab: TabKey;
   onTabChange: (t: TabKey) => void;
   traceOpen: boolean;
@@ -430,7 +468,17 @@ function ReportView({
             onReset={onMbtiReset}
           />
         )}
-        {tab !== "saju" && tab !== "g48" && tab !== "axis" && <NotReadyPanel tab={tab} />}
+        {tab === "ennea" && (
+          <EnneaPanel
+            ennea={ennea}
+            answers={enneaAnswers}
+            onAnswer={onEnneaAnswer}
+            onReset={onEnneaReset}
+          />
+        )}
+        {tab !== "saju" && tab !== "g48" && tab !== "axis" && tab !== "ennea" && (
+          <NotReadyPanel tab={tab} />
+        )}
 
         <div className="border-t border-neutral-200 bg-[--color-neutral-25]">
           <button
@@ -1434,6 +1482,563 @@ function AxisBar({
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 내면 동기 panel (Enneagram)
+
+function EnneaPanel({
+  ennea,
+  answers,
+  onAnswer,
+  onReset,
+}: {
+  ennea: EnneagramOutput | null;
+  answers: Record<string, EnneaLikertValue>;
+  onAnswer: (id: string, v: EnneaLikertValue) => void;
+  onReset: () => void;
+}) {
+  const answered = Object.keys(answers).length;
+  const total = ENNEA_ITEMS.length;
+  const complete = answered >= total;
+
+  const typeColor = (t: EnneaType) => ENNEA_TYPE_COLORS[t];
+
+  return (
+    <div className="px-6 py-8 md:px-10 md:py-10">
+      {/* Progress header */}
+      <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-[--color-neutral-25] p-4 shadow-sm">
+        <div>
+          <div
+            className="mb-1 text-[10px] uppercase tracking-[0.25em] text-[--color-accent-700]"
+            style={{ fontFamily: MONO }}
+          >
+            9유형 자가 진단 · Quick Screening v0.1
+          </div>
+          <div className="text-sm text-neutral-600">
+            총 {total}문항 · 7점 척도{" "}
+            <span className="text-neutral-400">· RHETI·HSS 공식 검사 아님</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <ProgressBar current={answered} total={total} />
+          {answered > 0 && (
+            <button
+              type="button"
+              onClick={onReset}
+              className="text-xs text-neutral-500 underline underline-offset-2 hover:text-[--color-accent-700]"
+            >
+              초기화
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* Result if complete */}
+      {ennea && complete && <EnneaResult ennea={ennea} typeColor={typeColor} />}
+
+      {/* Questions */}
+      <section className="grid grid-cols-1 gap-3">
+        {ENNEA_ITEMS.map((item, i) => (
+          <EnneaQuestionCard
+            key={item.id}
+            index={i + 1}
+            total={total}
+            prompt={item.prompt}
+            type={item.type}
+            color={typeColor(item.type)}
+            value={answers[item.id]}
+            onChange={(v) => onAnswer(item.id, v)}
+          />
+        ))}
+      </section>
+    </div>
+  );
+}
+
+// 9 유형별 시각 팔레트 (Terracotta 계열 내 채도 변이)
+const ENNEA_TYPE_COLORS: Record<EnneaType, string> = {
+  1: "#5B7760", // 목 — 원칙
+  2: "#D47A66", // 감정1
+  3: "#C4563C", // 감정2 (메인 악센트)
+  4: "#9A3E2A", // 감정3
+  5: "#2E3B4E", // 수 — 관찰
+  6: "#4A5D74", // 사고2
+  7: "#A88B5B", // 토 — 탐식
+  8: "#1A1814", // 본능 — 단호
+  9: "#B5B0A3", // 금 — 고요
+};
+
+function EnneaQuestionCard({
+  index,
+  total,
+  prompt,
+  type,
+  color,
+  value,
+  onChange,
+}: {
+  index: number;
+  total: number;
+  prompt: string;
+  type: EnneaType;
+  color: string;
+  value: EnneaLikertValue | undefined;
+  onChange: (v: EnneaLikertValue) => void;
+}) {
+  return (
+    <div
+      className="rounded-xl border border-neutral-200 bg-[--color-neutral-25] p-4 shadow-sm transition hover:border-neutral-300"
+      style={
+        value !== undefined
+          ? { borderColor: "var(--color-accent-300)" }
+          : undefined
+      }
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <div
+          className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-neutral-500"
+          style={{ fontFamily: MONO }}
+        >
+          <span className="tabular-nums">
+            {String(index).padStart(2, "0")}/{String(total).padStart(2, "0")}
+          </span>
+          <span
+            className="rounded-full px-2 py-0.5 font-mono text-[10px]"
+            style={{
+              backgroundColor: `${color}15`,
+              color: color,
+            }}
+          >
+            TYPE {type}
+          </span>
+        </div>
+      </div>
+      <p className="mb-4 text-base leading-relaxed text-neutral-800">{prompt}</p>
+      <EnneaLikertScale value={value} onChange={onChange} />
+    </div>
+  );
+}
+
+function EnneaLikertScale({
+  value,
+  onChange,
+}: {
+  value: EnneaLikertValue | undefined;
+  onChange: (v: EnneaLikertValue) => void;
+}) {
+  const values: EnneaLikertValue[] = [1, 2, 3, 4, 5, 6, 7];
+  const sizeMap = [26, 30, 34, 38, 34, 30, 26];
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[10px] uppercase tracking-wider text-neutral-400">
+        매우 반대
+      </span>
+      <div className="flex items-center gap-2">
+        {values.map((v, i) => {
+          const selected = value === v;
+          const sz = sizeMap[i] ?? 28;
+          return (
+            <button
+              key={v}
+              type="button"
+              onClick={() => onChange(v)}
+              aria-label={`점수 ${String(v)}`}
+              className={`flex items-center justify-center rounded-full border-2 transition ${
+                selected
+                  ? "border-[--color-accent-500] bg-[--color-accent-500]"
+                  : "border-neutral-300 bg-[--color-neutral-25] hover:border-[--color-accent-300]"
+              }`}
+              style={{ width: sz, height: sz }}
+            >
+              {selected && (
+                <span className="size-2 rounded-full bg-white opacity-90" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <span className="text-[10px] uppercase tracking-wider text-neutral-400">
+        매우 동의
+      </span>
+    </div>
+  );
+}
+
+function EnneaResult({
+  ennea,
+  typeColor,
+}: {
+  ennea: EnneagramOutput;
+  typeColor: (t: EnneaType) => string;
+}) {
+  const primary = ENNEA_TYPE_NAMES[ennea.primaryType];
+  const integration = ENNEA_TYPE_NAMES[ennea.arrows.integrationTo];
+  const disintegration = ENNEA_TYPE_NAMES[ennea.arrows.disintegrationTo];
+  const wing = ennea.wing.type ? ENNEA_TYPE_NAMES[ennea.wing.type] : null;
+
+  return (
+    <section className="mb-8 overflow-hidden rounded-2xl border border-[--color-accent-300]/50 bg-gradient-to-br from-[--color-neutral-25] via-[--color-neutral-25] to-[--color-accent-100]/40 p-6 shadow-sm md:p-8">
+      <div
+        className="mb-3 flex items-center gap-3 text-[10px] uppercase tracking-[0.25em] text-[--color-accent-700]"
+        style={{ fontFamily: MONO }}
+      >
+        <span>RESULT · Quick 18</span>
+        <div className="h-px flex-1 max-w-[6rem] bg-neutral-200" />
+      </div>
+
+      {/* Primary */}
+      <div className="mb-5 flex flex-wrap items-baseline gap-x-6 gap-y-2">
+        <div className="flex items-baseline gap-3">
+          <div
+            className="flex size-20 items-center justify-center rounded-full text-4xl text-white"
+            style={{
+              backgroundColor: typeColor(ennea.primaryType),
+              fontFamily: SERIF,
+              fontWeight: 500,
+            }}
+          >
+            {ennea.primaryType}
+          </div>
+          <div>
+            <div
+              className="text-2xl leading-tight tracking-tight"
+              style={{ fontFamily: SERIF }}
+            >
+              {primary.kr}
+            </div>
+            <div
+              className="text-sm text-neutral-500"
+              style={{ fontFamily: SERIF, fontStyle: "italic" }}
+            >
+              {primary.en}
+            </div>
+            {wing && (
+              <div
+                className="mt-1 text-[11px] uppercase tracking-wider text-neutral-500"
+                style={{ fontFamily: MONO }}
+              >
+                {ennea.primaryType}w{ennea.wing.type} · {wing.kr} 쪽으로 기울어짐
+                {" · "}
+                {Math.round(ennea.wing.strength * 100)}%
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Motivation keywords */}
+      <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div>
+          <div
+            className="mb-2 text-[10px] uppercase tracking-[0.2em] text-neutral-500"
+            style={{ fontFamily: MONO }}
+          >
+            핵심 동기
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {primary.motivationKeywords.map((k) => (
+              <span
+                key={k}
+                className="rounded-full border border-neutral-200 bg-[--color-neutral-25] px-2.5 py-1 text-xs text-neutral-700"
+              >
+                {k}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div
+            className="mb-2 text-[10px] uppercase tracking-[0.2em] text-neutral-500"
+            style={{ fontFamily: MONO }}
+          >
+            기본 두려움
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {primary.fearKeywords.map((k) => (
+              <span
+                key={k}
+                className="rounded-full border border-neutral-200 bg-neutral-100 px-2.5 py-1 text-xs text-neutral-500"
+              >
+                {k}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Radar + arrows row */}
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_1fr]">
+        <div className="rounded-xl border border-neutral-200 bg-[--color-neutral-25] p-4">
+          <div
+            className="mb-2 text-[10px] uppercase tracking-[0.25em] text-neutral-500"
+            style={{ fontFamily: MONO }}
+          >
+            § 9유형 점수 분포
+          </div>
+          <EnneaRadar scores={ennea.typeScores} primary={ennea.primaryType} />
+        </div>
+
+        <div className="space-y-3">
+          <div className="rounded-xl border border-neutral-200 bg-[--color-neutral-25] p-4">
+            <div
+              className="mb-2 text-[10px] uppercase tracking-[0.25em] text-neutral-500"
+              style={{ fontFamily: MONO }}
+            >
+              § 화살표
+            </div>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-start gap-3">
+                <div
+                  className="flex size-10 flex-none items-center justify-center rounded-full text-white"
+                  style={{
+                    backgroundColor: typeColor(ennea.arrows.integrationTo),
+                    fontFamily: SERIF,
+                  }}
+                >
+                  {ennea.arrows.integrationTo}
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-emerald-700">
+                    통합 방향 (성장)
+                  </div>
+                  <div style={{ fontFamily: SERIF }}>{integration.kr}</div>
+                  <div className="text-xs text-neutral-500">
+                    안정되었을 때 {integration.kr}의 맑은 면이 함께 나타나는 경향.
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 border-t border-neutral-100 pt-3">
+                <div
+                  className="flex size-10 flex-none items-center justify-center rounded-full text-white"
+                  style={{
+                    backgroundColor: typeColor(ennea.arrows.disintegrationTo),
+                    fontFamily: SERIF,
+                  }}
+                >
+                  {ennea.arrows.disintegrationTo}
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-amber-700">
+                    분열 방향 (스트레스)
+                  </div>
+                  <div style={{ fontFamily: SERIF }}>{disintegration.kr}</div>
+                  <div className="text-xs text-neutral-500">
+                    과부하가 걸렸을 때 {disintegration.kr}의 어두운 면이 스며드는 경향.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-neutral-200 bg-[--color-neutral-25] p-4">
+            <div
+              className="mb-2 text-[10px] uppercase tracking-[0.25em] text-neutral-500"
+              style={{ fontFamily: MONO }}
+            >
+              § 트라이어드
+            </div>
+            <TriadBars triad={ennea.triad} />
+          </div>
+        </div>
+      </div>
+
+      {/* Ambiguity warning */}
+      {ennea.ambiguity && (
+        <div className="mt-5 rounded-md border border-amber-200 bg-amber-50/50 p-3 text-xs text-neutral-700">
+          <div
+            className="mb-1 text-[10px] uppercase tracking-[0.2em] text-amber-700"
+            style={{ fontFamily: MONO }}
+          >
+            경계값 안내
+          </div>
+          <div>{ennea.ambiguity.note}</div>
+          <div className="mt-1 font-mono text-[11px] text-neutral-500">
+            후보: Type {ennea.ambiguity.nearTies[0]!.type} (
+            {ennea.ambiguity.nearTies[0]!.score.toFixed(0)}) vs Type{" "}
+            {ennea.ambiguity.nearTies[1]!.type} (
+            {ennea.ambiguity.nearTies[1]!.score.toFixed(0)})
+          </div>
+        </div>
+      )}
+
+      {/* Reliability */}
+      <div
+        className="mt-5 flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-neutral-500"
+        style={{ fontFamily: MONO }}
+      >
+        <span>
+          completion {Math.round(ennea.reliability.completion * 100)}%
+        </span>
+        <span>
+          decisiveness {Math.round(ennea.reliability.decisiveness * 100)}%
+        </span>
+        {ennea.reliability.flags.map((f) => (
+          <span
+            key={f}
+            className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700"
+          >
+            {f}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function EnneaRadar({
+  scores,
+  primary,
+}: {
+  scores: Record<EnneaType, number>;
+  primary: EnneaType;
+}) {
+  const size = 220;
+  const cx = size / 2;
+  const cy = size / 2;
+  const rMax = 82;
+  const labelR = 98;
+  const types: EnneaType[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const angleFor = (t: EnneaType) => -Math.PI / 2 + ((t - 1) * 2 * Math.PI) / 9;
+
+  const points = types.map((t) => {
+    const r = (scores[t] / 100) * rMax;
+    return [cx + r * Math.cos(angleFor(t)), cy + r * Math.sin(angleFor(t))] as const;
+  });
+  const polyStr = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
+
+  return (
+    <div className="flex items-center justify-center py-2">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {/* Grid rings */}
+        {[0.25, 0.5, 0.75, 1].map((k) => (
+          <circle
+            key={k}
+            cx={cx}
+            cy={cy}
+            r={rMax * k}
+            fill="none"
+            stroke="var(--color-neutral-200)"
+            strokeWidth={0.5}
+          />
+        ))}
+        {/* Axes */}
+        {types.map((t) => {
+          const a = angleFor(t);
+          return (
+            <line
+              key={t}
+              x1={cx}
+              y1={cy}
+              x2={cx + rMax * Math.cos(a)}
+              y2={cy + rMax * Math.sin(a)}
+              stroke="var(--color-neutral-200)"
+              strokeWidth={0.5}
+            />
+          );
+        })}
+        {/* Polygon */}
+        <polygon
+          points={polyStr}
+          fill="var(--color-accent-500)"
+          fillOpacity={0.18}
+          stroke="var(--color-accent-500)"
+          strokeWidth={1.5}
+          strokeLinejoin="round"
+        />
+        {/* Type dots */}
+        {types.map((t, i) => {
+          const [x, y] = points[i]!;
+          const isPrimary = t === primary;
+          return (
+            <circle
+              key={t}
+              cx={x}
+              cy={y}
+              r={isPrimary ? 4 : 2.5}
+              fill={isPrimary ? "var(--color-accent-700)" : "var(--color-accent-500)"}
+            />
+          );
+        })}
+        {/* Labels */}
+        {types.map((t) => {
+          const a = angleFor(t);
+          const lx = cx + labelR * Math.cos(a);
+          const ly = cy + labelR * Math.sin(a);
+          return (
+            <text
+              key={t}
+              x={lx}
+              y={ly + 4}
+              textAnchor="middle"
+              fontSize="11"
+              fill={t === primary ? "var(--color-accent-700)" : "var(--color-neutral-500)"}
+              fontWeight={t === primary ? 600 : 400}
+              style={{ fontFamily: "var(--font-mono)" }}
+            >
+              {t}
+            </text>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function TriadBars({
+  triad,
+}: {
+  triad: EnneagramOutput["triad"];
+}) {
+  const rows: Array<{ key: "body" | "heart" | "head"; value: number; color: string }> = [
+    { key: "body", value: triad.body, color: "var(--color-oh-earth)" },
+    { key: "heart", value: triad.heart, color: "var(--color-oh-fire)" },
+    { key: "head", value: triad.head, color: "var(--color-oh-water)" },
+  ];
+  const max = Math.max(...rows.map((r) => r.value), 1);
+
+  return (
+    <div className="space-y-2.5">
+      {rows.map((r) => {
+        const isDominant = triad.dominant === r.key;
+        const pct = (r.value / max) * 100;
+        const info = ENNEA_TRIAD_LABELS[r.key];
+        return (
+          <div key={r.key}>
+            <div className="mb-0.5 flex items-baseline justify-between text-xs">
+              <span
+                className={`flex items-center gap-2 ${isDominant ? "text-neutral-900" : "text-neutral-500"}`}
+              >
+                <span style={{ fontFamily: SERIF }}>{info.kr}</span>
+                <span
+                  className="text-[10px] text-neutral-400"
+                  style={{ fontFamily: MONO }}
+                >
+                  ({info.types.join("·")})
+                </span>
+              </span>
+              <span
+                className={`tabular-nums ${isDominant ? "text-neutral-900" : "text-neutral-400"}`}
+                style={{ fontFamily: MONO }}
+              >
+                {r.value.toFixed(0)}
+              </span>
+            </div>
+            <div className="relative h-2 overflow-hidden rounded-full bg-neutral-100">
+              <div
+                className="absolute inset-y-0 left-0 rounded-full transition-all"
+                style={{
+                  width: `${pct}%`,
+                  backgroundColor: r.color,
+                  opacity: isDominant ? 1 : 0.5,
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
